@@ -67,6 +67,15 @@ const fakeJournalDirectory = () => {
   } as unknown as ReadableDirectoryHandle;
 };
 
+// The connect screen shows the journal path for the system the browser reports. jsdom
+// reports whatever machine the tests run on, so the tests say which one they mean.
+const WINDOWS_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130";
+const LINUX_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130";
+const agentOnThisMachine = navigator.userAgent;
+
+const reportSystem = (userAgent: string) =>
+  Object.defineProperty(navigator, "userAgent", { value: userAgent, configurable: true });
+
 beforeAll(() => {
   // jsdom has no modal dialog behaviour of its own.
   HTMLDialogElement.prototype.showModal = function () {
@@ -79,6 +88,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  reportSystem(WINDOWS_USER_AGENT);
   localStorage.clear();
   useSettingsStore.setState({ ...DEFAULT_SETTINGS });
   useCommanderStore.setState({ commander: INITIAL_COMMANDER_STATE, connection: INITIAL_CONNECTION });
@@ -89,6 +99,7 @@ afterEach(() => {
   cleanup();
   delete (window as PickerWindow).showDirectoryPicker;
   Reflect.deleteProperty(navigator, "clipboard");
+  reportSystem(agentOnThisMachine);
   vi.useRealTimers();
 });
 
@@ -119,6 +130,18 @@ describe("Dashboard", () => {
     // ...and the confirmation does not linger.
     await elapse(3000);
     expect(screen.getByRole("button", { name: "Copy path" })).toBeInTheDocument();
+  });
+
+  it("shows the Proton path to a player on Linux", async () => {
+    reportSystem(LINUX_USER_AGENT);
+    (window as PickerWindow).showDirectoryPicker = vi.fn();
+    render(<Dashboard />);
+    await elapse(500);
+
+    expect(screen.getByText(/it is inside the game's Proton prefix/)).toBeInTheDocument();
+    expect(screen.getByText(/compatdata.359320/)).toBeInTheDocument();
+    // The Windows path is still one step away, folded away.
+    expect(screen.getByText("On Windows")).toBeInTheDocument();
   });
 
   it("says so when the path cannot be copied for the player", async () => {
