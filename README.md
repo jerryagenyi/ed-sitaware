@@ -11,7 +11,7 @@
 Inara and Spansh are unmatched databases, but they are **search-driven**. Every time you jump into a new sector, you have to alt-tab, open multiple tabs, type your current system name, and re-apply filters.
 
 **ED:SitAware** flips the workflow:
-* **Zero Typing:** Watches your local `Journal` folder directly in the browser (via the File System Access API) or via our lightweight desktop `.exe` wrapper (Tauri).
+* **Zero Typing:** Watches your local `Journal` folder directly in the browser (via the File System Access API); a lightweight desktop `.exe` wrapper (Tauri) is on the roadmap.
 * **Two-Way EDDN Citizen:** Consumes live galaxy intelligence *and* (with a single opt-in toggle) uploads your station visits and market scans straight to the **Elite Dangerous Data Network (EDDN)**—keeping Inara, Spansh, and ED:SitAware accurate for every Commander.
 * **Ship-Aware Filtering:** Automatically detects your current ship's landing pad size and jump range from your `Loadout` event so you never get routed to a Medium-only outpost in a Cutter.
 * **Modular "Checkbox Everything" Grid:** Toggle any intelligence card on or off independently. Start with built-in **Role Presets** (Trader, Miner, Bounty Hunter, Explorer, Coloniser) or tweak any combination to save your own **Custom Profiles**.
@@ -28,8 +28,19 @@ Inara and Spansh are unmatched databases, but they are **search-driven**. Every 
 * [References & Community Research (`REFERENCES.md`)](./REFERENCES.md) — Data sources, ecosystem tools, and community pain points that shaped this project.
 * [Contributing (`CONTRIBUTING.md`)](./CONTRIBUTING.md) — How to report bugs, pitch widgets, and submit pull requests.
 
-## Quick Start (Local Development)
-> **Pre-alpha:** the application itself has not landed in this repository yet, so the commands below will only work once the first code drop is merged.
+## What Works Today
+Pre-alpha. Built so far, and working in Chrome and Edge:
+* **Live journal sync:** connect your journal folder once and the dashboard tracks your system, station, ship and activity as you play — checked four times a second while the game is writing.
+* **Telemetry, current system and current station:** landing pads, services, distance from the star and faction states.
+* **Gotcha alerts:** long supercruise approaches, planetary ports, and factions in Lockdown or infrastructure failure.
+* **Global tactical controls:** search radius, supercruise limit (5,000 Ls by default, adjustable), landing pad filter (detected from your ship, or pinned), and fleet carrier exclusion.
+* **Checkbox everything:** five built-in role presets, custom profiles, pinned widgets, and profile export/import as JSON.
+* **Three cockpit themes** (Amber, Cyan, Slate). No account: your settings stay in your browser.
+
+Still to come: the sector feed that answers the *nearest ports, material traders, markets, mining and combat* widgets (their cards show the search they will run), the opt-in EDDN uploader, and the desktop `.exe`.
+
+## Quick Start
+You need Node 22 or later, and a Chromium browser (Chrome or Edge) to read your journal — Firefox and Safari cannot open local folders.
 
 ```bash
 git clone https://github.com/jerryagenyi/ed-sitaware.git
@@ -37,6 +48,17 @@ cd ed-sitaware
 npm install
 npm run dev
 ```
+
+Open <http://localhost:3000>, click **Choose journal folder**, and pick the folder that holds your `Journal.*.log` files — on Windows that is `Saved Games\Frontier Developments\Elite Dangerous`. To see the dashboard without the game, open <http://localhost:3000/?demo=1> instead.
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start the development server |
+| `npm test` | Run the unit and component tests |
+| `npm run typecheck` | Type-check |
+| `npm run lint` | Lint |
+| `npm run build` | Production build |
+| `npm run check` | All of the above in order — what CI runs |
 
 ## A Note on How This Project Is Built
 
