@@ -4,7 +4,7 @@ Welcome, Commander! `ED:SitAware` is a free, community-driven open-source tool b
 
 ## Ways to Contribute
 * **Report Bugs or "Gotchas":** Open an Issue if a ship pad size is mapped incorrectly, a journal event fails to parse, or a UI layout breaks on your screen resolution.
-* **Suggest Widgets or Role Presets:** Have an idea for a new tactical widget or a better default profile? Open an Issue or Discussion to pitch it.
+* **Suggest Widgets or Role Presets:** Have an idea for a new tactical widget or a better default profile? Open an Issue or Discussion to pitch it. Ideas that are agreed go onto the list in `TODO.md`.
 * **Submit Pull Requests:** Pick an open issue (or propose a small improvement) and open a PR.
 
 ## Development

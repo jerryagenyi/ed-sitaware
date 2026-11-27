@@ -26,6 +26,7 @@ Inara and Spansh are unmatched databases, but they are **search-driven**. Every 
 * [Product Requirements Document (`PRD.md`)](./PRD.md) — Full feature breakdown, UX architecture, and MVP vs. Post-MVP scope.
 * [Technical Architecture (`ARCHITECTURE.md`)](./ARCHITECTURE.md) — Data flow, spatial queries, and ship pad mapping.
 * [References & Community Research (`REFERENCES.md`)](./REFERENCES.md) — Data sources, ecosystem tools, and community pain points that shaped this project.
+* [Roadmap and to-do (`TODO.md`)](./TODO.md) — What is done, what is next, and what is planned for after the MVP.
 * [Contributing (`CONTRIBUTING.md`)](./CONTRIBUTING.md) — How to report bugs, pitch widgets, and submit pull requests.
 
 ## What Works Today
@@ -35,9 +36,10 @@ Pre-alpha. Built so far, and working in Chrome and Edge:
 * **Gotcha alerts:** long supercruise approaches, planetary ports, and factions in Lockdown or infrastructure failure.
 * **Global tactical controls:** search radius, supercruise limit (5,000 Ls by default, adjustable), landing pad filter (detected from your ship, or pinned), and fleet carrier exclusion.
 * **Checkbox everything:** five built-in role presets, custom profiles, pinned widgets, and profile export/import as JSON.
-* **Three cockpit themes** (Amber, Cyan, Slate). No account: your settings stay in your browser.
+* **Four cockpit themes** (Amber, Cyan, Slate, Light). No account: your settings stay in your browser.
+* **Finding the journal folder:** a copyable path, steps for the folder picker, and drag and drop.
 
-Still to come: the sector feed that answers the *nearest ports, material traders, markets, mining and combat* widgets (their cards show the search they will run), the opt-in EDDN uploader, and the desktop `.exe`.
+Still to come: the sector feed that answers the *nearest ports, material traders, markets, mining and combat* widgets (their cards show the search they will run), the opt-in EDDN uploader, the desktop `.exe`, and an in-game overlay window. The full list is in [`TODO.md`](./TODO.md).
 
 ## Quick Start
 You need Node 22 or later, and a Chromium browser (Chrome or Edge) to read your journal — Firefox and Safari cannot open local folders.
@@ -49,7 +51,7 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>, click **Choose journal folder**, and pick the folder that holds your `Journal.*.log` files — on Windows that is `Saved Games\Frontier Developments\Elite Dangerous`. To see the dashboard without the game, open <http://localhost:3000/?demo=1> instead.
+Open <http://localhost:3000> and click **Choose journal folder**. The folder is not where the game is installed: on Windows it is `%USERPROFILE%\Saved Games\Frontier Developments\Elite Dangerous`, and the app has a **Copy path** button so you can paste it straight into the picker. To see the dashboard without the game, open <http://localhost:3000/?demo=1> instead.
 
 | Command | What it does |
 |---|---|

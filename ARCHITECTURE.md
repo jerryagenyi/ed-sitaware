@@ -26,7 +26,7 @@
 
 ## 2. Tech Stack
 
-* **Frontend:** Next.js 16 (App Router, TypeScript) + Tailwind CSS 4 + Zustand 5 (state management). Design tokens live as CSS custom properties on `:root`, with three themes (`amber`, `cyan`, `slate`) switched by `data-theme` on `<html>`.
+* **Frontend:** Next.js 16 (App Router, TypeScript) + Tailwind CSS 4 + Zustand 5 (state management). Design tokens live as CSS custom properties on `:root`, with four themes (`amber`, `cyan`, `slate`, `light`) switched by `data-theme` on `<html>`.
 * **Desktop Packaging (planned):** **Tauri v2** (compiles the frontend into a lightweight Windows `.exe` / Linux binary with native filesystem watching and system tray support).
 * **Backend & Spatial DB (planned):** Node.js + **PostgreSQL** (indexed 3D `x`, `y`, `z` star coordinates) + **Redis** (5-minute cache for sector queries).
 * **Tests:** Vitest with Testing Library. Logic under `src/lib/` is pure and tested without a browser; the dashboard has component tests that play the demo session.
@@ -149,6 +149,7 @@ src/
 ├── components/     The cockpit UI: control bar, telemetry strip, cards, drawer, connect flow
 ├── hooks/
 ├── lib/
+│   ├── os.ts       Where each operating system keeps the journal folder
 │   ├── ships.ts    The ship → pad table and name matching
 │   ├── journal/    Pure journal logic: file names, line parsing, the state reducer, hazards
 │   ├── fsa/        File System Access helpers: the folder picker and the remembered folder
