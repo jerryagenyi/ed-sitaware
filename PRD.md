@@ -7,7 +7,8 @@
 
 ## 2. Distribution Strategy: Web-First + Lightweight `.exe`
 1. **Browser Web App (Zero Install):** Uses the Chromium **File System Access API** to read the local `Saved Games/Frontier Developments/Elite Dangerous` directory client-side. Ideal for quick testing, secondary devices, and players who don't want extra background programs. (Chromium-only: Chrome and Edge, not Firefox or Safari.)
-2. **Desktop Executable (`.exe` / AppImage via Tauri):** Wraps the exact same web UI in a ~10 MB native shell with system-tray support, automatic background folder watching (no manual folder re-selection on restart), and persistent EDDN uploading.
+2. **Desktop Executable (`.exe` / AppImage via Tauri):** Wraps the exact same web UI in a ~10 MB native shell with system-tray support, automatic background folder watching (no manual folder re-selection on restart), and persistent EDDN uploading. It also finds the journal folder by itself, so there is nothing to locate.
+3. **No Account, Ever:** Nothing is stored on a server. Profiles, filters and theme live in the browser's own storage (`localStorage`); the journal folder the player chose is remembered by the browser where it supports that, so a return visit is one click. The desktop build keeps the same settings in a local config file. The journal folder is opened read-only.
 
 ---
 
@@ -34,6 +35,7 @@ Role Presets are **curated starting templates of checked widgets and filter defa
 ---
 
 ## 4. Feature Roadmap: MVP vs. Post-MVP
+Which of these exist yet is tracked in [`TODO.md`](./TODO.md).
 
 ### Phase 1: MVP (Core Loop, Local Sync & EDDN Feed)
 *Goal: Deliver an ultra-fast, zero-typing tactical radar that solves daily navigation friction and contributes clean data back to EDDN.*
@@ -45,14 +47,14 @@ Role Presets are **curated starting templates of checked widgets and filter defa
    * Search Radius Slider (`10 LY` to `100 LY`, default `25 LY`).
    * Ship Pad Size Filter (`Auto from Ship` / `Any` / `Medium+` / `Large Only`).
    * Exclude Fleet Carriers toggle (`ON` by default).
-   * Max Supercruise Distance slider (`< 5,000 Ls` default).
+   * Supercruise Limit slider (`5,000 Ls` default, adjustable from `1,000 Ls` to `100,000 Ls`).
    * Profile Switcher + "Customise Widgets" checkbox drawer.
 3. **MVP Intelligence Modules (All Toggleable):**
    * **Nearest Ports & Services:** Ranked by LY distance + Ls from arrival star. Displays pad size, economy, allegiance, and colour-coded data age (`🟢 <2h`, `🟡 <24h`, `🔴 >24h`).
    * **Universal Utilities Finder:** Nearest Raw, Manufactured, and Encoded Material Traders, Interstellar Factors, and Human/Guardian Tech Brokers.
    * **Local Market Snapshot:** Top profitable exports from current station/system and top imports within LY radius.
    * **Mining & Reserves Scanner:** Systems within radius with Pristine/Major reserves and ring compositions (Metallic, Metal-Rich, Rocky, Icy).
-   * **"Gotcha" Hazard Alerts:** Automatic warning tags for Planetary Surface ports, High-G worlds (`> 1.5G`), Lockdown/Infrastructure Failure states, and `> 50,000 Ls` supercruise traps.
+   * **"Gotcha" Hazard Alerts:** Automatic warning tags for Planetary Surface ports, High-G worlds (`> 1.5G`), Lockdown/Infrastructure Failure states, and approaches longer than the player's supercruise limit.
 4. **Opt-In EDDN Telemetry Uploader:**
    * Toggleable switch (`Share Market & System Data with EDDN`).
    * Sanitises outbound data — only EDDN-whitelisted journal events are eligible, with all Commander-specific fields (e.g. `FID`, `Wanted`, `ActiveFine`) and `_Localised` keys removed — and validates every payload against the official `eddn.edcd.io` schemas (`journal/1`, `commodity/3`, `outfitting/2`, `shipyard/2`) before uploading quietly in the background.
@@ -75,10 +77,14 @@ Role Presets are **curated starting templates of checked widgets and filter defa
    * Identifies nearby systems whose factions exclusively issue pirate massacre missions targeting a single neighbouring Anarchy/Low-Sec system.
 5. **Mobile / Tablet QR Companion Mode:**
    * Local WebSocket bridge allowing the desktop `.exe` to stream live tactical updates to a phone or tablet on the same Wi-Fi network.
+6. **In-Game Overlay Window:**
+   * A small, minimal window that sits on top of the game and shows only the quick, relevant facts of the current situation, updating live as the commander plays — the point of the name SitAware.
+   * Switched on from the app with a single checkbox; the app sets its opacity and chooses, widget by widget, what it shows.
 
 ---
 
 ## 5. Non-Functional & Community Standards
 * **EDDN Compliance:** Strict adherence to `EDCD/EDDN` developer guidelines (software name/version headers, `gameversion`/`gamebuild` headers, schema validation, deduplication, and zero personal data leakage).
-* **Latency:** UI updates within `< 250ms` of a new line being written to `Journal.*.log`.
-* **Cockpit UI:** High-contrast dark theme with Elite-inspired Amber/Orange, Cyan, and Neutral Slate colour schemes.
+* **Latency:** In the browser, a new `Journal` line is on screen within `500ms` of being written (a `250ms` poll plus parsing); the desktop build watches the file natively and updates within `250ms`. See ARCHITECTURE §5.
+* **Resource Use:** Nothing is polled while disconnected. While connected, a poll that finds nothing costs one file-size check; polling slows to once a second once the journal has been quiet for five minutes or the session has ended.
+* **Cockpit UI:** High-contrast dark theme with Elite-inspired Amber/Orange, Cyan, and Neutral Slate colour schemes, plus a Light scheme for bright rooms. Every text colour meets WCAG AA in all four.
