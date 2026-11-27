@@ -3,7 +3,7 @@
  * stores need. Kept free of imports so the root layout can use it.
  */
 
-export const THEMES = ["amber", "cyan", "slate"] as const;
+export const THEMES = ["amber", "cyan", "slate", "light"] as const;
 
 export type ThemeId = (typeof THEMES)[number];
 

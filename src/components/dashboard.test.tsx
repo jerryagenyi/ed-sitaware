@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReadableDirectoryHandle } from "@/lib/fsa/directory-access";
 import { INITIAL_COMMANDER_STATE } from "@/lib/journal/state";
-import { useCommanderStore } from "@/store/commander";
+import { INITIAL_CONNECTION, useCommanderStore } from "@/store/commander";
 import { DEFAULT_SETTINGS, useSettingsStore } from "@/store/settings";
 import { Dashboard } from "./dashboard";
 
@@ -28,6 +29,44 @@ const startDemo = async () => {
 const card = (title: string) =>
   screen.getByRole("heading", { name: title }).closest("section") as HTMLElement;
 
+const REPO = "https://github.com/jerryagenyi/ed-sitaware";
+
+/** The panel a folder can be dropped on. */
+const dropPanel = () =>
+  screen.getByRole("region", { name: "Journal connection" }).querySelector(".drop-target") as HTMLElement;
+
+/** A journal folder as the browser would hand one over: no real file system involved. */
+const fakeJournalDirectory = () => {
+  const name = "Journal.2026-11-24T123720.01.log";
+  const text = `${JSON.stringify({
+    timestamp: "2026-11-24T12:37:21Z",
+    event: "Location",
+    StarSystem: "Eravine",
+    Docked: false,
+  })}
+`;
+  const bytes = new TextEncoder().encode(text);
+  return {
+    name: "Elite Dangerous",
+    kind: "directory",
+    async *entries() {
+      yield [
+        name,
+        {
+          kind: "file",
+          name,
+          getFile: async () => ({
+            size: bytes.length,
+            slice: (start: number, end: number) => ({
+              arrayBuffer: async () => bytes.slice(start, end).buffer,
+            }),
+          }),
+        },
+      ];
+    },
+  } as unknown as ReadableDirectoryHandle;
+};
+
 beforeAll(() => {
   // jsdom has no modal dialog behaviour of its own.
   HTMLDialogElement.prototype.showModal = function () {
@@ -42,13 +81,14 @@ beforeEach(() => {
   vi.useFakeTimers();
   localStorage.clear();
   useSettingsStore.setState({ ...DEFAULT_SETTINGS });
-  useCommanderStore.setState({ commander: INITIAL_COMMANDER_STATE });
+  useCommanderStore.setState({ commander: INITIAL_COMMANDER_STATE, connection: INITIAL_CONNECTION });
   window.history.replaceState(null, "", "/");
 });
 
 afterEach(() => {
   cleanup();
   delete (window as PickerWindow).showDirectoryPicker;
+  Reflect.deleteProperty(navigator, "clipboard");
   vi.useRealTimers();
 });
 
@@ -63,6 +103,105 @@ describe("Dashboard", () => {
     expect(screen.getByRole("button", { name: /Watch a demo session/ })).toBeInTheDocument();
     expect(screen.getByText(/There is no account/)).toBeInTheDocument();
     expect(screen.queryByRole("slider", { name: "Search radius" })).not.toBeInTheDocument();
+
+    // The folder is the one thing players cannot find. Say where it is, and make the path copyable.
+    expect(screen.getByRole("heading", { name: "Where is that folder?" })).toBeInTheDocument();
+    expect(screen.getByText(/Not where the game is installed/)).toBeInTheDocument();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    fireEvent.click(screen.getByRole("button", { name: "Copy path" }));
+    await elapse(0);
+    expect(writeText).toHaveBeenCalledWith(
+      String.raw`%USERPROFILE%\Saved Games\Frontier Developments\Elite Dangerous`,
+    );
+    expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
+    expect(screen.getByText("Path copied to the clipboard.")).toBeInTheDocument();
+    // ...and the confirmation does not linger.
+    await elapse(3000);
+    expect(screen.getByRole("button", { name: "Copy path" })).toBeInTheDocument();
+  });
+
+  it("says so when the path cannot be copied for the player", async () => {
+    (window as PickerWindow).showDirectoryPicker = vi.fn();
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn().mockRejectedValue(new Error("not allowed")) },
+      configurable: true,
+    });
+    render(<Dashboard />);
+    await elapse(500);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy path" }));
+    await elapse(0);
+
+    expect(screen.getByRole("button", { name: "Copy path" })).toBeInTheDocument();
+    expect(screen.getByText(/Select it above and copy it yourself/)).toBeInTheDocument();
+  });
+
+  it("connects when the journal folder is dropped on the panel", async () => {
+    (window as PickerWindow).showDirectoryPicker = vi.fn();
+    render(<Dashboard />);
+    await elapse(500);
+    const panel = dropPanel();
+
+    fireEvent.dragEnter(panel, { dataTransfer: { types: ["Files"] } });
+    expect(panel).toHaveAttribute("data-dragging", "true");
+    fireEvent.dragLeave(panel);
+    expect(panel).toHaveAttribute("data-dragging", "false");
+
+    fireEvent.drop(panel, {
+      dataTransfer: { items: [{ kind: "file", getAsFileSystemHandle: async () => fakeJournalDirectory() }] },
+    });
+    await elapse(1000);
+
+    expect(screen.getByRole("heading", { level: 2, name: "Eravine" })).toBeInTheDocument();
+    expect(screen.getAllByText(/Last event/).length).toBeGreaterThan(0);
+  });
+
+  it("explains when a single file is dropped instead of the folder", async () => {
+    (window as PickerWindow).showDirectoryPicker = vi.fn();
+    render(<Dashboard />);
+    await elapse(500);
+
+    fireEvent.drop(dropPanel(), {
+      dataTransfer: {
+        items: [{ kind: "file", getAsFileSystemHandle: async () => ({ kind: "file", name: "Journal.log" }) }],
+      },
+    });
+    await elapse(100);
+
+    expect(screen.getByText(/Drop the whole Elite Dangerous folder instead/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Connect your journal" })).toBeInTheDocument();
+  });
+
+  it("offers a light theme and applies it", async () => {
+    await startDemo();
+    const light = screen.getByRole("radio", { name: "Light" });
+    expect(light).not.toBeChecked();
+    fireEvent.click(light);
+    expect(light).toBeChecked();
+    expect(document.documentElement.dataset.theme).toBe("light");
+  });
+
+  it("closes every screen with copyright, licence and the way back to the project", async () => {
+    render(<Dashboard />);
+    await elapse(500);
+    const footer = screen.getByRole("contentinfo");
+
+    expect(footer).toHaveTextContent(`© ${new Date().getFullYear()} Jerry Agenyi`);
+    expect(footer).toHaveTextContent("not affiliated with Frontier Developments");
+    expect(footer).toHaveTextContent("there is no account");
+    const nav = within(footer).getByRole("navigation", { name: "Project" });
+    for (const [label, href] of [
+      ["GitHub", REPO],
+      ["Contribute", `${REPO}/blob/main/CONTRIBUTING.md`],
+      ["Report a bug", `${REPO}/issues`],
+      ["Roadmap", `${REPO}/blob/main/TODO.md`],
+      ["References", `${REPO}/blob/main/REFERENCES.md`],
+      ["MIT licence", `${REPO}/blob/main/LICENSE`],
+    ] as const) {
+      expect(within(footer).getByRole("link", { name: label })).toHaveAttribute("href", href);
+    }
+    expect(within(nav).getAllByRole("link")).toHaveLength(5);
   });
 
   it("says plainly when the browser cannot read local folders", async () => {
@@ -73,6 +212,21 @@ describe("Dashboard", () => {
       screen.getByRole("heading", { name: "This browser cannot read local folders" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Choose journal folder/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Watch a demo session/ })).toBeInTheDocument();
+  });
+
+  it("says so when the browser has a folder picker that cannot open", async () => {
+    (window as PickerWindow).showDirectoryPicker = vi
+      .fn()
+      .mockRejectedValue(new Error("not implemented here"));
+    render(<Dashboard />);
+    await elapse(500);
+    fireEvent.click(screen.getByRole("button", { name: /Choose journal folder/ }));
+    await elapse(100);
+
+    expect(
+      screen.getByRole("heading", { name: "This browser cannot read local folders" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Watch a demo session/ })).toBeInTheDocument();
   });
 

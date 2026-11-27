@@ -9,6 +9,7 @@ import { useSettingsStore } from "@/store/settings";
 import { Button } from "@/components/controls";
 import { ConnectPanel } from "@/components/connect-panel";
 import { ControlBar } from "@/components/control-bar";
+import { Footer } from "@/components/footer";
 import { TelemetryStrip } from "@/components/telemetry-strip";
 import { TopBar } from "@/components/topbar";
 import { WidgetDrawer } from "@/components/widget-drawer";
@@ -45,7 +46,7 @@ export function Dashboard() {
     });
 
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-dvh flex-col">
       <TopBar now={now} onCustomise={() => setDrawerOpen(true)} />
 
       {showDashboard && connection.state === "error" && (
@@ -67,16 +68,18 @@ export function Dashboard() {
       {showDashboard ? (
         <>
           <ControlBar />
-          <main className="mx-auto max-w-[1680px] px-6 pb-12">
+          <main className="mx-auto w-full max-w-[1680px] flex-1 px-6 pb-12">
             <TelemetryStrip now={now} />
             <WidgetGrid />
           </main>
         </>
       ) : (
-        <main className="mx-auto max-w-[1680px] px-6 pb-12">
+        <main className="mx-auto w-full max-w-[1680px] flex-1 px-6 pb-12">
           <ConnectPanel now={now} />
         </main>
       )}
+
+      <Footer />
 
       <WidgetDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>

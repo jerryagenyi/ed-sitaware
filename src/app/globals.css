@@ -50,7 +50,7 @@
  * Design tokens. Colour is split the same way in every theme: mostly neutrals, one
  * accent for what matters, one secondary for "live", and semantic colour only for
  * meaning. Every text colour meets 4.5:1 against the surfaces it sits on, and the
- * border that identifies a control meets 3:1 (WCAG 1.4.11).
+ * border that identifies a control meets 3:1 (WCAG 1.4.11), in all four themes.
  */
 :root {
   color-scheme: dark;
@@ -111,6 +111,42 @@
   --accent-2: #ffb347;
   --accent-2-soft: rgb(255 179 71 / 0.14);
   --info: #b5c2cf;
+}
+
+/*
+ * Daylight. The same structure as the cockpit themes, on paper: accents are darkened
+ * so they still carry as text, and native controls are told to draw themselves light.
+ */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #e8ecf1;
+  --surface: #ffffff;
+  --surface-raised: #f1f4f8;
+  --panel-border: rgb(16 24 40 / 0.12);
+  --panel-border-strong: rgb(16 24 40 / 0.52);
+  --rule: rgb(16 24 40 / 0.06);
+
+  --fg: #15181e;
+  --fg-muted: #515a69;
+  /* Dividers and decorative marks only; never body copy. */
+  --fg-faint: #7b8494;
+
+  --accent: #b45309;
+  --accent-strong: #8a3d05;
+  --accent-soft: rgb(180 83 9 / 0.11);
+  --on-accent: #ffffff;
+
+  --accent-2: #0c6a86;
+  --accent-2-soft: rgb(12 106 134 / 0.11);
+
+  --danger: #b42318;
+  --danger-soft: rgb(180 35 24 / 0.08);
+  --warn: #744a00;
+  --warn-soft: rgb(116 74 0 / 0.11);
+  --info: #46536a;
+
+  --focus: #15181e;
 }
 
 [data-theme="slate"] {
@@ -748,6 +784,45 @@
     to {
       background-color: transparent;
     }
+  }
+
+  /* ---------- Links and footer ---------- */
+
+  .footer a {
+    color: var(--fg);
+    text-decoration: underline;
+    text-decoration-color: var(--panel-border-strong);
+    text-underline-offset: 3px;
+    transition: text-decoration-color var(--dur-fast) var(--ease-out);
+  }
+
+  .footer a:hover {
+    text-decoration-color: var(--accent);
+  }
+
+  /* ---------- Dropping a folder onto the connect panel ---------- */
+
+  .drop-target {
+    position: relative;
+  }
+
+  .drop-target__overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    place-items: center;
+    padding: 20px;
+    text-align: center;
+    font-size: var(--text-h3);
+    font-weight: 600;
+    color: var(--accent-strong);
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    /* Must let the drop itself through to the panel underneath. */
+    pointer-events: none;
+  }
+
+  .drop-target[data-dragging="true"] .drop-target__overlay {
+    display: grid;
   }
 
   /* ---------- Drawer ---------- */

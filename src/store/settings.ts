@@ -24,6 +24,7 @@ export const THEMES: readonly { id: ThemeId; label: string }[] = [
   { id: "amber", label: "Amber" },
   { id: "cyan", label: "Cyan" },
   { id: "slate", label: "Slate" },
+  { id: "light", label: "Light" },
 ];
 
 export const DEFAULT_THEME: ThemeId = DEFAULT_THEME_ID;

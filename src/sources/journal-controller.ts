@@ -1,12 +1,14 @@
 import {
   canReadLocalFolders,
   pickJournalDirectory,
+  type ReadableDirectoryHandle,
 } from "@/lib/fsa/directory-access";
 import {
   clearDirectoryHandle,
   loadDirectoryHandle,
   saveDirectoryHandle,
 } from "@/lib/fsa/directory-store";
+import { readDroppedFolder, type DropCarrier } from "@/lib/fsa/drag-drop";
 import { INITIAL_CONNECTION, useCommanderStore } from "@/store/commander";
 import { DemoJournalSource } from "./demo-journal-source";
 import { DEMO_LINES } from "./demo/sample-journal";
@@ -14,11 +16,12 @@ import { FileSystemJournalSource } from "./file-system-journal-source";
 import type { JournalSink, JournalSource } from "./journal-source";
 
 export type PickOutcome = "started" | "cancelled" | "unsupported";
+export type DropOutcome = "started" | "file" | "unsupported" | "nothing";
 
 /**
  * Owns whichever journal source is running and feeds it into the stores. Components
- * only ever talk to this, so connecting from a button, restoring on load and the demo
- * mode all share one set of rules.
+ * only ever talk to this, so connecting from a button, dropping a folder, restoring
+ * on load and the demo mode all share one set of rules.
  */
 export class JournalController {
   private source: JournalSource | null = null;
@@ -74,12 +77,35 @@ export class JournalController {
       return "unsupported";
     }
     const generation = this.generation;
-    const handle = await pickJournalDirectory().catch(() => null);
+    let handle: ReadableDirectoryHandle | null;
+    try {
+      handle = await pickJournalDirectory();
+    } catch {
+      // The function exists but the browser could not open its picker.
+      useCommanderStore.getState().setConnection({ state: "unsupported", error: null });
+      return "unsupported";
+    }
     if (!handle || generation !== this.generation) {
       return "cancelled";
     }
-    await saveDirectoryHandle(handle).catch(() => undefined);
-    await this.start(new FileSystemJournalSource(handle, this.sink), generation);
+    await this.connect(handle, generation);
+    return "started";
+  }
+
+  /** The player dragged the journal folder onto the page instead of picking it. */
+  async dropDirectory(event: DropCarrier): Promise<DropOutcome> {
+    const generation = this.generation;
+    const dropped = await readDroppedFolder(event);
+    if (dropped === null) {
+      return "nothing";
+    }
+    if (typeof dropped === "string") {
+      return dropped;
+    }
+    if (generation !== this.generation) {
+      return "nothing";
+    }
+    await this.connect(dropped, generation);
     return "started";
   }
 
@@ -127,6 +153,12 @@ export class JournalController {
     this.generation += 1;
     this.source?.stop();
     this.source = null;
+  }
+
+  /** Remember a folder the player handed over, picked or dropped, and start watching it. */
+  private async connect(handle: ReadableDirectoryHandle, generation: number): Promise<void> {
+    await saveDirectoryHandle(handle).catch(() => undefined);
+    await this.start(new FileSystemJournalSource(handle, this.sink), generation);
   }
 
   private async start(source: JournalSource, generation: number): Promise<void> {
