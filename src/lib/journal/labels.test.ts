@@ -7,6 +7,8 @@ import {
   labelFromKey,
   notableServices,
   serviceLabel,
+  stationNoun,
+  stationPreposition,
   stationTypeLabel,
 } from "./labels";
 
@@ -57,6 +59,17 @@ describe("services and station types", () => {
     expect(isSurfaceStation(null)).toBe(false);
     expect(isFleetCarrier("FleetCarrier")).toBe(true);
     expect(isFleetCarrier("Coriolis")).toBe(false);
+  });
+
+  it("calls the place what it is: a carrier is not a station", () => {
+    expect(stationNoun("FleetCarrier")).toBe("carrier");
+    expect(stationNoun("CraterPort")).toBe("port");
+    expect(stationNoun("Orbis")).toBe("station");
+    expect(stationNoun(null)).toBe("station");
+    // "On a carrier", but "at a station" or "at a port".
+    expect(stationPreposition("FleetCarrier")).toBe("on");
+    expect(stationPreposition("Outpost")).toBe("at");
+    expect(stationPreposition("CraterPort")).toBe("at");
   });
 
   it("labels station types", () => {

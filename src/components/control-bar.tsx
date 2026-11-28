@@ -1,10 +1,11 @@
 "use client";
 
+import { RotateCcw } from "lucide-react";
 import { formatInt } from "@/lib/format";
 import { RADIUS, SUPERCRUISE_STEPS } from "@/lib/profiles";
 import { useSettingsStore, useEffectiveProfile } from "@/store/settings";
 import { PAD_FILTERS } from "@/lib/profiles";
-import { RangeControl, Segmented, Switch } from "@/components/controls";
+import { Button, RangeControl, Segmented, Switch } from "@/components/controls";
 
 /** The global tactical controls from the PRD: radius, pads, supercruise, carriers, profile. */
 export function ControlBar() {
@@ -12,6 +13,7 @@ export function ControlBar() {
   const profiles = useSettingsStore((state) => state.profiles);
   const updateConfig = useSettingsStore((state) => state.updateConfig);
   const selectProfile = useSettingsStore((state) => state.selectProfile);
+  const resetProfile = useSettingsStore((state) => state.resetProfile);
 
   const supercruiseIndex = Math.max(
     0,
@@ -86,9 +88,15 @@ export function ControlBar() {
             ))}
           </select>
           {profile.modified && (
-            <span className="badge badge--warn" title="You have tweaked this preset. Save it as a profile to keep the tweaks.">
-              Tweaked
-            </span>
+            // The news that a preset was changed is only useful with the way to undo it.
+            <Button
+              icon
+              aria-label={`Reset ${profile.name} to its defaults`}
+              title={`You have changed this preset. Reset it to its defaults, or open Customise to keep the changes as a new profile.`}
+              onClick={resetProfile}
+            >
+              <RotateCcw aria-hidden="true" />
+            </Button>
           )}
         </div>
       </div>

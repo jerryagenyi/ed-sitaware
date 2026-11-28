@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { RefreshCw, TriangleAlert } from "lucide-react";
 import { useNow } from "@/hooks/use-now";
 import { journal } from "@/sources/journal-controller";
@@ -8,6 +8,7 @@ import { useCommanderStore } from "@/store/commander";
 import { useSettingsStore } from "@/store/settings";
 import { Button } from "@/components/controls";
 import { ConnectPanel } from "@/components/connect-panel";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ControlBar } from "@/components/control-bar";
 import { Footer } from "@/components/footer";
 import { TelemetryStrip } from "@/components/telemetry-strip";
@@ -15,13 +16,25 @@ import { TopBar } from "@/components/topbar";
 import { WidgetDrawer } from "@/components/widget-drawer";
 import { WidgetGrid } from "@/components/widget-grid";
 
+/** Something the player has asked for and is now being asked whether they mean it. */
+type Pending = "disconnect" | "forget" | null;
+
 export function Dashboard() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [pending, setPending] = useState<Pending>(null);
   const connection = useCommanderStore((state) => state.connection);
   const hasData = useCommanderStore((state) => state.commander.lastEvent !== null);
 
-  useEffect(() => {
+  // Settings are read before the first paint, so a returning player's choices never flash.
+  useLayoutEffect(() => {
     void useSettingsStore.persist.rehydrate();
+    // Until the player picks a theme, it follows the system's own light or dark setting.
+    if (!useSettingsStore.getState().themeChosen) {
+      useSettingsStore.getState().followSystemTheme();
+    }
+  }, []);
+
+  useEffect(() => {
     // `?demo=1` opens the dashboard playing a sample session, with no journal needed.
     const demo = new URLSearchParams(window.location.search).get("demo") === "1";
     if (demo) {
@@ -47,7 +60,11 @@ export function Dashboard() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <TopBar now={now} onCustomise={() => setDrawerOpen(true)} />
+      <TopBar
+        now={now}
+        onCustomise={() => setDrawerOpen(true)}
+        onDisconnect={() => setPending("disconnect")}
+      />
 
       {showDashboard && connection.state === "error" && (
         <div
@@ -81,7 +98,37 @@ export function Dashboard() {
 
       <Footer />
 
-      <WidgetDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <WidgetDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onDisconnect={() => setPending("disconnect")}
+        onForget={() => setPending("forget")}
+      />
+
+      <ConfirmDialog
+        open={pending === "disconnect"}
+        title="Disconnect from your journal?"
+        body="The briefing stops following the game. Your folder is remembered, so connecting again is one click."
+        confirmLabel="Disconnect"
+        cancelLabel="Keep watching"
+        onConfirm={() => {
+          setPending(null);
+          journal.disconnect();
+        }}
+        onCancel={() => setPending(null)}
+      />
+      <ConfirmDialog
+        open={pending === "forget"}
+        title="Forget this folder?"
+        body="ED:SitAware stops asking for this folder, and you will need to choose it again next time. Your profiles and settings are kept."
+        confirmLabel="Forget it"
+        cancelLabel="Keep it"
+        onConfirm={() => {
+          setPending(null);
+          void journal.forget();
+        }}
+        onCancel={() => setPending(null)}
+      />
     </div>
   );
 }

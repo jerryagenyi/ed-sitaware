@@ -132,11 +132,12 @@ export class JournalController {
   /** Stop watching but keep everything the player set up. What was on screen is cleared. */
   disconnect(): void {
     this.stop();
-    const { storedFolderName } = useCommanderStore.getState().connection;
+    const { folderName, storedFolderName } = useCommanderStore.getState().connection;
     useCommanderStore.getState().resetSession();
     useCommanderStore.getState().setConnection({
       ...INITIAL_CONNECTION,
-      storedFolderName,
+      // The folder just disconnected from is the one to offer next time.
+      storedFolderName: folderName ?? storedFolderName,
       state: "disconnected",
     });
   }

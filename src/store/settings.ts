@@ -1,12 +1,16 @@
 import { useMemo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { isThemeId, SETTINGS_STORAGE_KEY, type ThemeId } from "@/lib/storage-keys";
+import { DEFAULT_CARD_ORDER, isDefaultCardOrder, sanitiseCardOrder, type CardId } from "@/lib/card-order";
 import {
-  DEFAULT_THEME_ID,
-  isThemeId,
-  SETTINGS_STORAGE_KEY,
-  type ThemeId,
-} from "@/lib/storage-keys";
+  DEFAULT_DARK_COLOUR,
+  isDarkColour,
+  systemPrefersLight,
+  themeForNewVisitor,
+  toggledTheme,
+  type DarkColour,
+} from "@/lib/theme";
 import {
   BUILT_IN_PROFILES,
   effectiveProfile,
@@ -20,21 +24,22 @@ import {
 } from "@/lib/profiles";
 import { WIDGETS, type WidgetId } from "@/lib/widgets";
 
-export const THEMES: readonly { id: ThemeId; label: string }[] = [
-  { id: "amber", label: "Amber" },
-  { id: "cyan", label: "Cyan" },
-  { id: "slate", label: "Slate" },
-  { id: "light", label: "Light" },
-];
-
-export const DEFAULT_THEME: ThemeId = DEFAULT_THEME_ID;
-
 /** Bump when the persisted shape changes and add a migration in `persist`. */
 export const SETTINGS_VERSION = 1;
 
 /** What is kept between visits. There is no account: it lives in this browser only. */
 export interface PersistedSettings {
+  /** Light, or one of the three dark colours. */
   theme: ThemeId;
+  /** The dark colour to go back to when leaving light mode. */
+  darkColour: DarkColour;
+  /** The order the player dragged the dashboard cards into. */
+  cardOrder: CardId[];
+  /**
+   * Whether the player has ever picked a theme. Until they do, the theme follows the
+   * system's own light or dark setting, visit after visit.
+   */
+  themeChosen: boolean;
   activeProfileId: string;
   profiles: Profile[];
   overrides: Record<string, Partial<ProfileConfig>>;
@@ -42,7 +47,14 @@ export interface PersistedSettings {
 }
 
 interface SettingsActions {
-  setTheme: (theme: ThemeId) => void;
+  /** The player picked a theme. From here on, their choice stands. */
+  chooseTheme: (theme: ThemeId) => void;
+  /** Take the system's light or dark setting, without counting it as a choice. */
+  followSystemTheme: () => void;
+  /** The sun and moon button: swap between light mode and the last dark colour. */
+  toggleLightDark: () => void;
+  setCardOrder: (order: CardId[]) => void;
+  resetCardOrder: () => void;
   selectProfile: (profileId: string) => void;
   /** Change part of the active profile. A built-in preset keeps the change as a tweak. */
   updateConfig: (patch: Partial<ProfileConfig>) => void;
@@ -61,7 +73,10 @@ interface SettingsActions {
 export type SettingsState = PersistedSettings & SettingsActions;
 
 export const DEFAULT_SETTINGS: PersistedSettings = {
-  theme: DEFAULT_THEME,
+  theme: DEFAULT_DARK_COLOUR,
+  darkColour: DEFAULT_DARK_COLOUR,
+  cardOrder: [...DEFAULT_CARD_ORDER],
+  themeChosen: false,
   activeProfileId: BUILT_IN_PROFILES[0].id,
   profiles: [...BUILT_IN_PROFILES],
   overrides: {},
@@ -150,8 +165,23 @@ export function sanitizeSettings(persisted: unknown): PersistedSettings {
     }
   }
 
+  const theme = isThemeId(persisted.theme) ? persisted.theme : DEFAULT_SETTINGS.theme;
+
   return {
-    theme: isThemeId(persisted.theme) ? persisted.theme : DEFAULT_SETTINGS.theme,
+    theme,
+    // A stored colour that is missing or broken falls back to the theme itself when that is dark.
+    darkColour: isDarkColour(persisted.darkColour)
+      ? persisted.darkColour
+      : isDarkColour(theme)
+        ? theme
+        : DEFAULT_SETTINGS.darkColour,
+    cardOrder: sanitiseCardOrder(persisted.cardOrder),
+    // Settings stored before this was recorded carry no flag. For those, a theme other
+    // than the default was picked; for everything else the flag itself is believed.
+    themeChosen:
+      typeof persisted.themeChosen === "boolean"
+        ? persisted.themeChosen
+        : isThemeId(persisted.theme) && persisted.theme !== DEFAULT_SETTINGS.theme,
     activeProfileId:
       typeof persisted.activeProfileId === "string" &&
       profiles.some((profile) => profile.id === persisted.activeProfileId)
@@ -182,7 +212,24 @@ export const useSettingsStore = create<SettingsState>()(
     (set, get) => ({
       ...DEFAULT_SETTINGS,
 
-      setTheme: (theme) => set({ theme }),
+      // Choosing a colour is also choosing dark mode, and it is the colour light mode comes back to.
+      chooseTheme: (theme) =>
+        set(isDarkColour(theme) ? { theme, darkColour: theme, themeChosen: true } : { theme, themeChosen: true }),
+
+      followSystemTheme: () => set({ theme: themeForNewVisitor(systemPrefersLight()) }),
+
+      toggleLightDark: () => {
+        const { theme, darkColour } = get();
+        set({ theme: toggledTheme(theme, darkColour), themeChosen: true });
+      },
+
+      setCardOrder: (cardOrder) => set({ cardOrder }),
+
+      resetCardOrder: () => {
+        if (!isDefaultCardOrder(get().cardOrder)) {
+          set({ cardOrder: [...DEFAULT_CARD_ORDER] });
+        }
+      },
 
       selectProfile: (profileId) => {
         if (get().profiles.some((profile) => profile.id === profileId)) {
@@ -327,8 +374,11 @@ export const useSettingsStore = create<SettingsState>()(
       storage: createJSONStorage(() => localStorage),
       // Hydration is triggered after mount so the first client render matches the server.
       skipHydration: true,
-      partialize: ({ theme, activeProfileId, profiles, overrides, pinnedWidgets }) => ({
+      partialize: ({ theme, darkColour, cardOrder, themeChosen, activeProfileId, profiles, overrides, pinnedWidgets }) => ({
         theme,
+        darkColour,
+        cardOrder,
+        themeChosen,
         activeProfileId,
         profiles,
         overrides,
@@ -350,8 +400,16 @@ export function useEffectiveProfile(): EffectiveProfile {
   );
 }
 
-export function useTheme(): [ThemeId, (theme: ThemeId) => void] {
+/** The theme as it stands, whether it was chosen, and the ways to change it. */
+export function useTheme() {
   const theme = useSettingsStore((state) => state.theme);
-  const setTheme = useSettingsStore((state) => state.setTheme);
-  return [theme, setTheme];
+  const darkColour = useSettingsStore((state) => state.darkColour);
+  const themeChosen = useSettingsStore((state) => state.themeChosen);
+  const chooseTheme = useSettingsStore((state) => state.chooseTheme);
+  const toggleLightDark = useSettingsStore((state) => state.toggleLightDark);
+  const followSystemTheme = useSettingsStore((state) => state.followSystemTheme);
+  return useMemo(
+    () => ({ theme, darkColour, themeChosen, chooseTheme, toggleLightDark, followSystemTheme }),
+    [theme, darkColour, themeChosen, chooseTheme, toggleLightDark, followSystemTheme],
+  );
 }

@@ -6,7 +6,7 @@ The working list of what is left. The [PRD](./PRD.md) says *why* each thing exis
 
 ## Now
 
-- [ ] Watch a real game session end to end in Chrome or Edge. Everything up to the folder picker is tested; the picker itself is a native dialog that only a person can click through.
+- [ ] Watch a real game session end to end: undocking and jumping arriving live in the browser. The folder is connected and a docked session has been read; movement has not yet been seen live.
 
 ## Next — finish the MVP
 
@@ -31,6 +31,7 @@ Their cards exist already and show the search each will run.
 ### Sharper gotchas
 - [ ] High-G worlds (`> 1.5 G`) at planetary ports; needs the body's surface gravity.
 - [ ] Read `Status.json` for docked, supercruise and on-foot flags, which it reports sooner than the journal.
+- [ ] A carrier's distance from the star when the player logs in on one: the journal does not give it then, so look back into the earlier journals for the last known figure, and say how old it is.
 
 ## Later — post-MVP
 
@@ -65,4 +66,8 @@ Their cards exist already and show the search each will run.
 - [x] Settings kept on the player's machine, with no account.
 - [x] Four themes: Amber, Cyan, Slate, Light.
 - [x] Finding the journal folder: a copyable path, steps for the picker, and drag and drop.
+- [x] Cards dragged into any order and remembered; folded down on phones.
+- [x] Sun and moon for light and dark; follows the system setting until the player chooses.
+- [x] Disconnecting asks first; the folder is remembered afterwards.
+- [x] Says where the journal is silent: a carrier at login, an uninhabited system.
 - [x] CI: type-check, lint, test and build.

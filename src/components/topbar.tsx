@@ -1,29 +1,65 @@
 "use client";
 
-import { SlidersHorizontal, Unplug, X } from "lucide-react";
-import { useLayoutEffect } from "react";
-import { THEMES, useTheme } from "@/store/settings";
+import { Moon, SlidersHorizontal, Sun, Unplug, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useSyncExternalStore } from "react";
+import { DARK_COLOURS } from "@/lib/theme";
 import { journal } from "@/sources/journal-controller";
 import { useCommanderStore } from "@/store/commander";
+import { useTheme } from "@/store/settings";
 import { Button, Segmented } from "@/components/controls";
 import { ConnectionChip } from "@/components/connection-chip";
 
+const subscribeToNothing = () => () => undefined;
+
+/** What the server draws before anyone's settings are known. */
+const SERVER_THEME = "amber" as const;
+
+/**
+ * A sun and moon button for light and dark, and the three cockpit colours for dark
+ * mode. Light mode is one look of its own, so the colours step aside while it is on.
+ */
 function ThemeSwitch() {
-  const [theme, setTheme] = useTheme();
+  const { theme, darkColour, themeChosen, chooseTheme, toggleLightDark, followSystemTheme } = useTheme();
+  // False while the server's markup is being hydrated, true after.
+  const mounted = useSyncExternalStore(subscribeToNothing, () => true, () => false);
+
   // The theme is applied before paint by a script in the document head. Re-apply it
   // here too, because React's development remount resets attributes on <html>.
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
+  // Someone who has not chosen a theme keeps following the system, even as it changes under them.
+  useEffect(() => {
+    if (themeChosen || typeof window.matchMedia !== "function") {
+      return;
+    }
+    const query = window.matchMedia("(prefers-color-scheme: light)");
+    const follow = () => followSystemTheme();
+    query.addEventListener?.("change", follow);
+    return () => query.removeEventListener?.("change", follow);
+  }, [themeChosen, followSystemTheme]);
+
+  // Until hydration is over, draw what the server drew. React corrects it before the first paint.
+  const current = mounted ? theme : SERVER_THEME;
+  const light = current === "light";
+  const toggleLabel = light ? "Light mode. Switch to dark mode" : "Dark mode. Switch to light mode";
+
   return (
-    <Segmented
-      label="Theme"
-      hideLabel
-      options={THEMES.map(({ id, label }) => ({ value: id, label }))}
-      value={theme}
-      onChange={setTheme}
-    />
+    <div className="flex items-center gap-2">
+      {!light && (
+        <Segmented
+          label="Colour"
+          hideLabel
+          options={DARK_COLOURS.map(({ value, label }) => ({ value, label }))}
+          value={mounted ? darkColour : SERVER_THEME}
+          onChange={chooseTheme}
+        />
+      )}
+      <Button icon aria-label={toggleLabel} title={toggleLabel} onClick={toggleLightDark}>
+        {light ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+      </Button>
+    </div>
   );
 }
 
@@ -48,9 +84,11 @@ function Reticle() {
 interface TopBarProps {
   now: number;
   onCustomise: () => void;
+  /** Called when the player asks to stop following their journal. The caller checks they mean it. */
+  onDisconnect: () => void;
 }
 
-export function TopBar({ now, onCustomise }: TopBarProps) {
+export function TopBar({ now, onCustomise, onDisconnect }: TopBarProps) {
   const connection = useCommanderStore((state) => state.connection);
   const following = connection.state === "live" || connection.state === "error";
   const demo = connection.source === "demo";
@@ -71,11 +109,12 @@ export function TopBar({ now, onCustomise }: TopBarProps) {
           </span>
         </Button>
         {following && (
+          // Leaving the demo loses nothing. Disconnecting from a journal is worth a second look.
           <Button
             icon
             aria-label={demo ? "Exit the demo" : "Disconnect from the journal"}
             title={demo ? "Exit the demo" : "Disconnect"}
-            onClick={() => journal.disconnect()}
+            onClick={demo ? () => journal.disconnect() : onDisconnect}
           >
             {demo ? <X aria-hidden="true" /> : <Unplug aria-hidden="true" />}
           </Button>

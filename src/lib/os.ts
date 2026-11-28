@@ -20,9 +20,9 @@ export const JOURNAL_LOCATIONS: Record<Exclude<Platform, "other">, JournalLocati
   windows: {
     system: "Windows",
     path: "%USERPROFILE%\\Saved Games\\Frontier Developments\\Elite Dangerous",
-    where: "a hidden folder called Saved Games, next to Documents",
+    where: "in the Saved Games folder of the Windows account you play under, wherever the game itself lives",
     fallback:
-      "Press Win+R, type shell:savedgames and press Enter. That opens the real Saved Games folder even if it has been moved. Inside, open Frontier Developments, then Elite Dangerous.",
+      "Press Win+R, type shell:savedgames and press Enter: that opens the real Saved Games folder even if it has been moved to another drive. Inside, open Frontier Developments, then Elite Dangerous. If you play under a different Windows account, it is in that account's folder.",
   },
   linux: {
     system: "Linux (through Steam Proton)",

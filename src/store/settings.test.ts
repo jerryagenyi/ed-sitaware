@@ -6,6 +6,7 @@ import {
   parseProfileImport,
   type EffectiveProfile,
 } from "@/lib/profiles";
+import { DEFAULT_CARD_ORDER, moveCard } from "@/lib/card-order";
 import type { WidgetId } from "@/lib/widgets";
 import { SETTINGS_STORAGE_KEY } from "@/lib/storage-keys";
 import { DEFAULT_SETTINGS, sanitizeSettings, useSettingsStore } from "./settings";
@@ -185,14 +186,68 @@ describe("sanitizeSettings", () => {
     const persisted = partialize?.(store());
     expect(Object.keys(persisted ?? {}).sort()).toEqual([
       "activeProfileId",
+      "cardOrder",
+      "darkColour",
       "overrides",
       "pinnedWidgets",
       "profiles",
       "theme",
+      "themeChosen",
     ]);
   });
 
   it("uses the stable key the theme script reads", () => {
     expect(SETTINGS_STORAGE_KEY).toBe("ed-sitaware:settings");
+  });
+});
+
+describe("theme", () => {
+  it("follows the system until the player chooses", () => {
+    expect(store().themeChosen).toBe(false);
+    store().followSystemTheme();
+    // jsdom reports no preference, so the system counts as dark.
+    expect(store().theme).toBe("amber");
+    expect(store().themeChosen).toBe(false);
+
+    store().chooseTheme("cyan");
+    expect(store()).toMatchObject({ theme: "cyan", darkColour: "cyan", themeChosen: true });
+  });
+
+  it("swaps between light and the colour last used, and counts that as choosing", () => {
+    store().chooseTheme("slate");
+    store().toggleLightDark();
+    expect(store()).toMatchObject({ theme: "light", darkColour: "slate", themeChosen: true });
+    store().toggleLightDark();
+    expect(store().theme).toBe("slate");
+  });
+
+  it("reads a choice made before choices were recorded", () => {
+    expect(sanitizeSettings({ theme: "cyan" }).themeChosen).toBe(true);
+    expect(sanitizeSettings({ theme: "light" }).themeChosen).toBe(true);
+    // The default on its own proves nothing: keep following the system.
+    expect(sanitizeSettings({ theme: "amber" }).themeChosen).toBe(false);
+    expect(sanitizeSettings({ theme: "amber", themeChosen: true }).themeChosen).toBe(true);
+    // A light theme taken from the system, and recorded as no choice, stays no choice.
+    expect(sanitizeSettings({ theme: "light", themeChosen: false }).themeChosen).toBe(false);
+  });
+
+  it("falls back to the theme itself for a dark colour that is missing or broken", () => {
+    expect(sanitizeSettings({ theme: "cyan", darkColour: "neon" })).toMatchObject({
+      theme: "cyan",
+      darkColour: "cyan",
+    });
+    expect(sanitizeSettings({ theme: "light", darkColour: "neon" }).darkColour).toBe("amber");
+  });
+});
+
+describe("card order", () => {
+  it("keeps the order the player dragged, and goes back to the start on request", () => {
+    expect(store().cardOrder).toEqual([...DEFAULT_CARD_ORDER]);
+    const moved = moveCard(DEFAULT_CARD_ORDER, "system", "combat_zones");
+    store().setCardOrder(moved);
+    expect(store().cardOrder).toEqual(moved);
+
+    store().resetCardOrder();
+    expect(store().cardOrder).toEqual([...DEFAULT_CARD_ORDER]);
   });
 });

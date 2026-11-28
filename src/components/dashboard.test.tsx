@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_CARD_ORDER, moveCard } from "@/lib/card-order";
 import type { ReadableDirectoryHandle } from "@/lib/fsa/directory-access";
+import { SETTINGS_STORAGE_KEY } from "@/lib/storage-keys";
 import { INITIAL_COMMANDER_STATE } from "@/lib/journal/state";
 import { INITIAL_CONNECTION, useCommanderStore } from "@/store/commander";
 import { DEFAULT_SETTINGS, useSettingsStore } from "@/store/settings";
@@ -30,6 +32,22 @@ const card = (title: string) =>
   screen.getByRole("heading", { name: title }).closest("section") as HTMLElement;
 
 const REPO = "https://github.com/jerryagenyi/ed-sitaware";
+
+/** Names from the demo session, which stands in for a real one. */
+const HOME_SYSTEM = "Col 278 Sector LS-Z b31-2";
+const CARRIER = "SQA-7D4";
+
+/** Makes the browser report what the system asks for: light, or not. */
+const systemWantsLight = (light: boolean) =>
+  Object.defineProperty(window, "matchMedia", {
+    value: (query: string) => ({ matches: light && query.includes("light"), media: query }),
+    configurable: true,
+    writable: true,
+  });
+
+/** The cards on screen, in the order they are drawn. */
+const cardsOnScreen = () =>
+  [...document.querySelectorAll("[data-card]")].map((card) => card.getAttribute("data-card"));
 
 /** The panel a folder can be dropped on. */
 const dropPanel = () =>
@@ -99,6 +117,7 @@ afterEach(() => {
   cleanup();
   delete (window as PickerWindow).showDirectoryPicker;
   Reflect.deleteProperty(navigator, "clipboard");
+  Reflect.deleteProperty(window, "matchMedia");
   reportSystem(agentOnThisMachine);
   vi.useRealTimers();
 });
@@ -196,13 +215,172 @@ describe("Dashboard", () => {
     expect(screen.getByRole("heading", { name: "Connect your journal" })).toBeInTheDocument();
   });
 
-  it("offers a light theme and applies it", async () => {
+  it("switches between light and dark with the sun and moon button", async () => {
     await startDemo();
-    const light = screen.getByRole("radio", { name: "Light" });
-    expect(light).not.toBeChecked();
-    fireEvent.click(light);
-    expect(light).toBeChecked();
+    expect(document.documentElement.dataset.theme).toBe("amber");
+
+    fireEvent.click(screen.getByRole("button", { name: "Dark mode. Switch to light mode" }));
     expect(document.documentElement.dataset.theme).toBe("light");
+    // Light mode is one look of its own: the dark colours step aside while it is on.
+    expect(screen.queryByRole("radio", { name: "Amber" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Light mode. Switch to dark mode" })).toBeInTheDocument();
+
+    // Back to dark: the colour last used is the one that comes back.
+    fireEvent.click(screen.getByRole("button", { name: "Light mode. Switch to dark mode" }));
+    expect(document.documentElement.dataset.theme).toBe("amber");
+    fireEvent.click(screen.getByRole("radio", { name: "Cyan" }));
+    expect(document.documentElement.dataset.theme).toBe("cyan");
+    fireEvent.click(screen.getByRole("button", { name: "Dark mode. Switch to light mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Light mode. Switch to dark mode" }));
+    expect(document.documentElement.dataset.theme).toBe("cyan");
+  });
+
+  it("follows the system's light or dark setting on a first visit", async () => {
+    systemWantsLight(true);
+    render(<Dashboard />);
+    await elapse(500);
+
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(screen.getByRole("button", { name: "Light mode. Switch to dark mode" })).toBeInTheDocument();
+  });
+
+  it("keeps following the system on later visits, until the player chooses", async () => {
+    systemWantsLight(false);
+    // Stored on an earlier visit when the system wanted light, and the player chose nothing.
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify({ state: { ...DEFAULT_SETTINGS, theme: "light" }, version: 1 }),
+    );
+    render(<Dashboard />);
+    await elapse(500);
+
+    expect(document.documentElement.dataset.theme).toBe("amber");
+  });
+
+  it("keeps the theme the player chose, whatever the system says", async () => {
+    systemWantsLight(true);
+    // Chosen in a build that did not record choices yet, so the stored settings carry no flag.
+    const olderSettings = { ...DEFAULT_SETTINGS, themeChosen: undefined };
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify({ state: { ...olderSettings, theme: "cyan", darkColour: "cyan" }, version: 1 }),
+    );
+    render(<Dashboard />);
+    await elapse(500);
+
+    expect(document.documentElement.dataset.theme).toBe("cyan");
+    expect(screen.getByRole("radio", { name: "Cyan" })).toBeChecked();
+  });
+
+  it("keeps a theme chosen in this build, whatever the system says", async () => {
+    systemWantsLight(true);
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        state: { ...DEFAULT_SETTINGS, theme: "slate", darkColour: "slate", themeChosen: true },
+        version: 1,
+      }),
+    );
+    render(<Dashboard />);
+    await elapse(500);
+
+    expect(document.documentElement.dataset.theme).toBe("slate");
+  });
+
+  it("asks before disconnecting, and offers the same folder afterwards", async () => {
+    (window as PickerWindow).showDirectoryPicker = vi.fn();
+    render(<Dashboard />);
+    await elapse(500);
+    fireEvent.drop(dropPanel(), {
+      dataTransfer: { items: [{ kind: "file", getAsFileSystemHandle: async () => fakeJournalDirectory() }] },
+    });
+    await elapse(1000);
+    expect(screen.getByRole("heading", { level: 2, name: "Eravine" })).toBeInTheDocument();
+
+    const askToDisconnect = () =>
+      fireEvent.click(screen.getByRole("button", { name: "Disconnect from the journal" }));
+    const question = () => screen.getByRole("dialog", { name: "Disconnect from your journal?" });
+
+    askToDisconnect();
+    expect(question()).toHaveAttribute("open");
+    expect(question()).toHaveTextContent(/Your folder is remembered/);
+
+    // Stepping back changes nothing.
+    fireEvent.click(within(question()).getByRole("button", { name: "Keep watching" }));
+    await elapse(100);
+    // A closed dialog is hidden from assistive technology, so ask the element itself.
+    expect(document.querySelector("dialog.confirm")).not.toHaveAttribute("open");
+    expect(screen.getByRole("heading", { level: 2, name: "Eravine" })).toBeInTheDocument();
+
+    // Meaning it stops following the game, and remembers where to pick up again.
+    askToDisconnect();
+    fireEvent.click(within(question()).getByRole("button", { name: "Disconnect" }));
+    await elapse(100);
+    expect(screen.queryByRole("heading", { level: 2, name: "Eravine" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Welcome back, Commander" })).toBeInTheDocument();
+    expect(screen.getByText(/Reconnect to “Elite Dangerous”/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reconnect" })).toBeInTheDocument();
+  });
+
+  it("offers a reset that says what it resets once a preset has been changed", async () => {
+    const resetName = "Reset General / Bubble runner to its defaults";
+    await startDemo();
+    expect(screen.queryByRole("button", { name: resetName })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("slider", { name: "Search radius" }), { target: { value: "60" } });
+    fireEvent.click(screen.getByRole("button", { name: resetName }));
+
+    expect(screen.getAllByText("25 ly").length).toBeGreaterThanOrEqual(3);
+    expect(screen.queryByRole("button", { name: resetName })).not.toBeInTheDocument();
+  });
+
+  it("says a system is uninhabited instead of showing a card of dashes", async () => {
+    await startDemo();
+    // The demo starts in a system where nobody lives.
+    expect(screen.getByText(/Uninhabited\. No one lives here/)).toBeInTheDocument();
+    expect(screen.getByText("Uninhabited")).toBeInTheDocument();
+    expect(within(card("Current system")).queryByText("Controlling faction")).not.toBeInTheDocument();
+  });
+
+  it("lets a card fold up and open again", async () => {
+    await startDemo();
+    const hide = screen.getByRole("button", { name: "Hide current system" });
+    const body = document.getElementById(hide.getAttribute("aria-controls") ?? "");
+    expect(hide).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(hide);
+    const show = screen.getByRole("button", { name: "Show current system" });
+    expect(show).toHaveAttribute("aria-expanded", "false");
+    // Folded away on phones; this class is what hides it there.
+    expect(body).toHaveClass("hidden");
+
+    fireEvent.click(show);
+    expect(body).not.toHaveClass("hidden");
+  });
+
+  it("draws the cards in the player's order, and offers the way back once they have moved", async () => {
+    const resetOrderName = "Put the cards back in their starting order";
+    await startDemo();
+    expect(cardsOnScreen()).toEqual([
+      "system",
+      "station",
+      "hazard_alerts",
+      "nearest_ports",
+      "material_traders",
+      "interstellar_factors",
+    ]);
+
+    useSettingsStore.setState({ cardOrder: moveCard(DEFAULT_CARD_ORDER, "system", "combat_zones") });
+    await elapse(100);
+    expect(cardsOnScreen().at(-1)).toBe("system");
+
+    fireEvent.click(screen.getByRole("button", { name: "Customise briefing" }));
+    const drawer = screen.getByRole("dialog", { name: "Customise briefing" });
+    fireEvent.click(within(drawer).getByRole("button", { name: resetOrderName }));
+
+    expect(useSettingsStore.getState().cardOrder).toEqual([...DEFAULT_CARD_ORDER]);
+    expect(cardsOnScreen()[0]).toBe("system");
+    expect(within(drawer).queryByRole("button", { name: resetOrderName })).not.toBeInTheDocument();
   });
 
   it("closes every screen with copyright, licence and the way back to the project", async () => {
@@ -256,18 +434,23 @@ describe("Dashboard", () => {
   it("follows the demo session from a docked start to a docked finish", async () => {
     await startDemo();
 
-    expect(screen.getByRole("heading", { level: 2, name: "Eravine" })).toBeInTheDocument();
-    expect(screen.getAllByText("Docked · at Kestrel Reach").length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { level: 2, name: HOME_SYSTEM })).toBeInTheDocument();
+    expect(screen.getAllByText(`Docked · on ${CARRIER}`).length).toBeGreaterThan(0);
+    // Sitting on a carrier is not being at a station, and at a login the journal
+    // gives neither the distance from the star nor the pads.
+    expect(screen.getByRole("heading", { name: "Current carrier" })).toBeInTheDocument();
+    expect(screen.getAllByText("Given when you dock").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/or the carrier you are on/)).toBeInTheDocument();
     expect(screen.getByText("Second Screen · Cobra Mk III")).toBeInTheDocument();
     // Once in the telemetry strip and once in each widget that filters by pad.
     expect(screen.getAllByText("Auto · S pad").length).toBeGreaterThanOrEqual(2);
 
     await elapse(14_500);
-    expect(screen.getByRole("heading", { level: 2, name: "Eravine" })).toBeInTheDocument();
-    expect(screen.getAllByText(/Hyperspace · jumping to Voss 214/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { level: 2, name: HOME_SYSTEM })).toBeInTheDocument();
+    expect(screen.getAllByText(/Hyperspace · jumping to Eravine/).length).toBeGreaterThan(0);
 
     await elapse(16_500);
-    expect(screen.getByRole("heading", { level: 2, name: "Voss 214" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Eravine" })).toBeInTheDocument();
     expect(screen.getAllByText("Docked · at Thornbury Point").length).toBeGreaterThan(0);
 
     const alerts = within(card("Gotcha alerts"));
@@ -290,7 +473,7 @@ describe("Dashboard", () => {
     expect(techBrokers).not.toBeChecked();
     fireEvent.click(techBrokers);
     expect(screen.getByRole("heading", { name: "Tech brokers" })).toBeInTheDocument();
-    expect(within(drawer).getByText("Tweaked")).toBeInTheDocument();
+    expect(within(drawer).getByText(/You have changed this preset/)).toBeInTheDocument();
 
     // A pin keeps a widget on whichever profile is active, even one that switches it off.
     fireEvent.click(within(drawer).getByRole("button", { name: "Pin HazRES & conflict zones on every profile" }));

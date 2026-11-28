@@ -8,6 +8,7 @@ export const HANDLED_EVENTS: ReadonlySet<string> = new Set([
   // Session
   "Fileheader",
   "LoadGame",
+  "GameModeChange",
   "Commander",
   "Shutdown",
   // Ship

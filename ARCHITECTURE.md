@@ -26,7 +26,7 @@
 
 ## 2. Tech Stack
 
-* **Frontend:** Next.js 16 (App Router, TypeScript) + Tailwind CSS 4 + Zustand 5 (state management). Design tokens live as CSS custom properties on `:root`, with four themes (`amber`, `cyan`, `slate`, `light`) switched by `data-theme` on `<html>`.
+* **Frontend:** Next.js 16 (App Router, TypeScript) + Tailwind CSS 4 + Zustand 5 (state management). Design tokens live as CSS custom properties on `:root`, with four themes (`amber`, `cyan`, `slate`, `light`) switched by `data-theme` on `<html>`. A script in the document head sets the theme before the first paint: the stored one, or, for a player who has not chosen, the system's own light or dark setting. Cards are reordered with dnd-kit (pointer, touch and keyboard); the order is one more stored setting.
 * **Desktop Packaging (planned):** **Tauri v2** (compiles the frontend into a lightweight Windows `.exe` / Linux binary with native filesystem watching and system tray support).
 * **Backend & Spatial DB (planned):** Node.js + **PostgreSQL** (indexed 3D `x`, `y`, `z` star coordinates) + **Redis** (5-minute cache for sector queries).
 * **Tests:** Vitest with Testing Library. Logic under `src/lib/` is pure and tested without a browser; the dashboard has component tests that play the demo session.
@@ -136,10 +136,12 @@ There is no server-side profile. Everything a player sets is kept on their own m
 
 | What | Browser build | Desktop build (planned) |
 |---|---|---|
-| Profiles, tweaks, pins, theme, active profile | `localStorage`, key `ed-sitaware:settings`, versioned | a JSON file in the OS app-data folder |
+| Profiles, tweaks, pins, theme and whether it was chosen, card order, active profile | `localStorage`, key `ed-sitaware:settings`, versioned | a JSON file in the OS app-data folder |
 | The journal folder they chose | `IndexedDB` holds the folder handle; access survives a restart where the browser allows it, otherwise one click re-grants it | the folder path, so it is never asked for twice |
 
-Whatever was stored is validated before it is used (`sanitizeSettings`): broken values fall back to defaults, and built-in presets always come from the current code, so an update to a preset reaches the player. A built-in preset is never mutated — the player's tweaks sit beside it as an override until they *Save as profile*.
+Whatever was stored is validated before it is used (`sanitizeSettings`): broken values fall back to defaults, and built-in presets always come from the current code, so an update to a preset reaches the player. A built-in preset is never mutated — the player's tweaks sit beside it as an override until they *Save as profile*. The journal folder is remembered after a disconnect as well as after a reload, so the connect screen offers it back.
+
+**What the journal leaves out.** A few things players expect to see are not in the file at the moment they look. At a login with the commander already docked, `Location` gives no landing-pad counts, and for a fleet carrier no distance from the star either; both arrive with the next `Docked` event (185 of 185 real carrier dockings carry the distance). An uninhabited system has no `Factions` at all. The cards say this in words rather than showing a blank. The engine also reads `GameModeChange`, which follows `LoadGame` in a real session.
 
 ## 7. Project Layout
 
@@ -149,7 +151,9 @@ src/
 ├── components/     The cockpit UI: control bar, telemetry strip, cards, drawer, connect flow
 ├── hooks/
 ├── lib/
+│   ├── card-order.ts  The order of the cards, and how it is stored and reset
 │   ├── os.ts       Where each operating system keeps the journal folder
+│   ├── theme.ts    Light and dark, the three colours, and the system setting
 │   ├── ships.ts    The ship → pad table and name matching
 │   ├── journal/    Pure journal logic: file names, line parsing, the state reducer, hazards
 │   ├── fsa/        File System Access helpers: the folder picker and the remembered folder

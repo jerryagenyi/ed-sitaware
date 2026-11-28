@@ -260,6 +260,42 @@ describe("describeActivity", () => {
   });
 });
 
+describe("what the journal leaves out", () => {
+  it("follows a change of game mode, which is its own event", () => {
+    const state = fold([
+      ev("LoadGame", { Commander: "HRC1", GameMode: "Open" }),
+      ev("GameModeChange", { GameMode: "Solo" }),
+    ]);
+    expect(state.gameMode).toBe("Solo");
+  });
+
+  it("reads a login on a fleet carrier: the carrier, but no distance from the star and no pads", () => {
+    const state = fold([
+      ev("Location", {
+        StarSystem: "Col 278 Sector LS-Z b31-2",
+        Docked: true,
+        StationName: "ABCD",
+        StationType: "FleetCarrier",
+      }),
+    ]);
+    expect(state.station).toMatchObject({
+      name: "ABCD",
+      type: "FleetCarrier",
+      distanceFromStarLs: null,
+      pads: null,
+    });
+  });
+
+  it("says 'on' a carrier and 'at' a station", () => {
+    const carrier = fold([
+      ev("Location", { StarSystem: "X", Docked: true, StationName: "ABCD", StationType: "FleetCarrier" }),
+    ]);
+    expect(describeActivity(carrier, NOW)).toEqual({ label: "Docked", detail: "on ABCD" });
+    const station = fold([ev("Location", { StarSystem: "X", Docked: true, StationName: "Y", StationType: "Orbis" })]);
+    expect(describeActivity(station, NOW)).toEqual({ label: "Docked", detail: "at Y" });
+  });
+});
+
 describe("privacy", () => {
   it("never keeps fields that identify or describe the player", () => {
     const state = fold([

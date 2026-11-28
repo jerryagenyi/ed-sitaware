@@ -53,7 +53,7 @@ export function TelemetryStrip({ now }: { now: number }) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:items-end">
         <div className="min-w-0">
           <p className="hud-label">System</p>
-          <h2 className="mt-1 text-display font-semibold tracking-tight break-words" title={systemName}>
+          <h2 className="mt-1 text-display font-semibold tracking-tight break-words text-accent-strong" title={systemName}>
             <Flash changeKey={systemName}>{systemName}</Flash>
           </h2>
           <p className="mt-1 text-body text-muted">
