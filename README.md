@@ -38,11 +38,14 @@ Pre-alpha. Built so far, and working in Chrome and Edge:
 * **Checkbox everything:** five built-in role presets, custom profiles, pinned widgets, and profile export/import as JSON.
 * **Four cockpit themes** (Amber, Cyan, Slate, Light). No account: your settings stay in your browser.
 * **Finding the journal folder:** a copyable path, steps for the folder picker, and drag and drop.
+* **Your layout:** drag cards into any order and it is remembered; on a phone, fold cards down to their titles.
+* **Light and dark:** a sun and moon button. Until you choose, the briefing follows your system's own setting.
+* **Disconnecting asks first**, and your folder is remembered so connecting again is one click.
 
 Still to come: the sector feed that answers the *nearest ports, material traders, markets, mining and combat* widgets (their cards show the search they will run), the opt-in EDDN uploader, the desktop `.exe`, and an in-game overlay window. The full list is in [`TODO.md`](./TODO.md).
 
 ## Quick Start
-You need Node 22 or later, and a Chromium browser (Chrome or Edge) to read your journal — Firefox and Safari cannot open local folders.
+You need Node 22 or later, and a Chromium browser (Chrome or Edge) to read your journal — Firefox and Safari cannot open local folders. A folder picked in the browser is remembered for that browser only.
 
 ```bash
 git clone https://github.com/jerryagenyi/ed-sitaware.git

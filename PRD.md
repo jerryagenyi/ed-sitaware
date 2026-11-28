@@ -8,7 +8,7 @@
 ## 2. Distribution Strategy: Web-First + Lightweight `.exe`
 1. **Browser Web App (Zero Install):** Uses the Chromium **File System Access API** to read the local `Saved Games/Frontier Developments/Elite Dangerous` directory client-side. Ideal for quick testing, secondary devices, and players who don't want extra background programs. (Chromium-only: Chrome and Edge, not Firefox or Safari.)
 2. **Desktop Executable (`.exe` / AppImage via Tauri):** Wraps the exact same web UI in a ~10 MB native shell with system-tray support, automatic background folder watching (no manual folder re-selection on restart), and persistent EDDN uploading. It also finds the journal folder by itself, so there is nothing to locate.
-3. **No Account, Ever:** Nothing is stored on a server. Profiles, filters and theme live in the browser's own storage (`localStorage`); the journal folder the player chose is remembered by the browser where it supports that, so a return visit is one click. The desktop build keeps the same settings in a local config file. The journal folder is opened read-only.
+3. **No Account, Ever:** Nothing is stored on a server. Profiles, filters, card order and theme live in the browser's own storage (`localStorage`); the journal folder the player chose is remembered by the browser where it supports that, so a return visit is one click. Disconnecting asks first, and the folder is still remembered afterwards. The desktop build keeps the same settings in a local config file. The journal folder is opened read-only.
 
 ---
 
@@ -19,6 +19,8 @@ Every intelligence module in ED:SitAware is an independent, toggleable widget ca
 * **Master Widget Drawer:** Players can check or uncheck any module at any time regardless of their active role.
 * **Universal Pinning:** Essential utilities (e.g., *Material Traders*, *Interstellar Factors*, *Tech Brokers*) can be pinned so they remain visible across every profile.
 * **Per-Widget Inline Filters:** Each card includes quick controls (e.g., max supercruise distance in Ls, exclude Fleet Carriers, max data age in hours).
+* **Cards in the Player's Order:** Any card can be dragged to any place, on any screen, and the order is remembered. One control puts them back.
+* **Cards Fold on Phones:** On a phone each card can be folded up to its title, so a long briefing stays short enough to scroll.
 
 ### 3.2 Role Presets & Custom Profiles
 Role Presets are **curated starting templates of checked widgets and filter defaults**—never restrictive modes:
@@ -51,6 +53,7 @@ Which of these exist yet is tracked in [`TODO.md`](./TODO.md).
    * Profile Switcher + "Customise Widgets" checkbox drawer.
 3. **MVP Intelligence Modules (All Toggleable):**
    * **Nearest Ports & Services:** Ranked by LY distance + Ls from arrival star. Displays pad size, economy, allegiance, and colour-coded data age (`🟢 <2h`, `🟡 <24h`, `🔴 >24h`).
+   * **Honest About the Journal:** Where the journal does not say (a carrier's distance from the star at a login, an uninhabited system's factions), the briefing says so in words rather than showing a blank.
    * **Universal Utilities Finder:** Nearest Raw, Manufactured, and Encoded Material Traders, Interstellar Factors, and Human/Guardian Tech Brokers.
    * **Local Market Snapshot:** Top profitable exports from current station/system and top imports within LY radius.
    * **Mining & Reserves Scanner:** Systems within radius with Pristine/Major reserves and ring compositions (Metallic, Metal-Rich, Rocky, Icy).
@@ -87,4 +90,4 @@ Which of these exist yet is tracked in [`TODO.md`](./TODO.md).
 * **EDDN Compliance:** Strict adherence to `EDCD/EDDN` developer guidelines (software name/version headers, `gameversion`/`gamebuild` headers, schema validation, deduplication, and zero personal data leakage).
 * **Latency:** In the browser, a new `Journal` line is on screen within `500ms` of being written (a `250ms` poll plus parsing); the desktop build watches the file natively and updates within `250ms`. See ARCHITECTURE §5.
 * **Resource Use:** Nothing is polled while disconnected. While connected, a poll that finds nothing costs one file-size check; polling slows to once a second once the journal has been quiet for five minutes or the session has ended.
-* **Cockpit UI:** High-contrast dark theme with Elite-inspired Amber/Orange, Cyan, and Neutral Slate colour schemes, plus a Light scheme for bright rooms. Every text colour meets WCAG AA in all four.
+* **Cockpit UI:** Dark mode in Elite-inspired Amber/Orange, Cyan, or Neutral Slate, and a Light mode for bright rooms, switched by a sun and moon button. A first-time visitor gets whatever light or dark setting their system asks for, and keeps following it until they pick. The headings that say where you are and how things stand carry the theme colour. Every text colour meets WCAG AA in all four themes.
