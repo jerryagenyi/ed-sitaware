@@ -1,22 +1,55 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { ChevronDown } from "lucide-react";
+import { useId, useState, type ReactNode } from "react";
 
 interface HudPanelProps {
   title: string;
   /** Shown at the right of the header: badges, a source tag. */
   actions?: ReactNode;
+  /** The grip that drags the card to another place. */
+  dragHandle?: ReactNode;
+  /** Lets the card fold up on phones, where a page of open cards is a long scroll. */
+  collapsible?: boolean;
   children: ReactNode;
 }
 
 /** A card in the briefing: a thin frame with two clipped corners. */
-export function HudPanel({ title, actions, children }: HudPanelProps) {
+export function HudPanel({ title, actions, dragHandle, collapsible = false, children }: HudPanelProps) {
+  const [collapsed, setCollapsed] = useState(false);
+  const bodyId = useId();
+  const toggleLabel = collapsed ? `Show ${title.toLowerCase()}` : `Hide ${title.toLowerCase()}`;
+
   return (
     <section className="hud-panel">
       <div className="hud-panel__body">
         <header className="hud-panel__header">
           <h2>{title}</h2>
-          {actions}
+          <div className="flex flex-none items-center gap-1">
+            {actions}
+            {dragHandle}
+            {collapsible && (
+              // Phones only: from tablet width up a card is always open.
+              <button
+                type="button"
+                className="btn btn--icon md:hidden"
+                aria-expanded={!collapsed}
+                aria-controls={bodyId}
+                aria-label={toggleLabel}
+                title={toggleLabel}
+                onClick={() => setCollapsed((value) => !value)}
+              >
+                <ChevronDown
+                  aria-hidden="true"
+                  className={`transition-transform duration-150 ${collapsed ? "" : "rotate-180"}`}
+                />
+              </button>
+            )}
+          </div>
         </header>
-        {children}
+        <div id={bodyId} className={collapsed ? "hidden md:block" : ""}>
+          {children}
+        </div>
       </div>
     </section>
   );

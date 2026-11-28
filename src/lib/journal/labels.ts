@@ -146,3 +146,19 @@ export function isSurfaceStation(type: string | null | undefined): boolean {
 export function isFleetCarrier(type: string | null | undefined): boolean {
   return type !== null && type !== undefined && type.toLowerCase() === "fleetcarrier";
 }
+
+/**
+ * The journal files carriers and surface ports under "stations". Players do not:
+ * someone sitting on their own carrier is not "at a station".
+ */
+export function stationNoun(type: string | null | undefined): "station" | "carrier" | "port" {
+  if (isFleetCarrier(type)) {
+    return "carrier";
+  }
+  return isSurfaceStation(type) ? "port" : "station";
+}
+
+/** "at a station", but "on a carrier": the preposition that goes with the noun. */
+export function stationPreposition(type: string | null | undefined): "at" | "on" {
+  return type !== null && type !== undefined && isSurfaceStation(type) ? "at" : stationNoun(type) === "carrier" ? "on" : "at";
+}

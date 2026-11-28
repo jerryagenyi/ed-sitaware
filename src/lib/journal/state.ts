@@ -7,7 +7,7 @@ import {
   asStringList,
   type RawJournalEvent,
 } from "./fields";
-import { humaniseId, labelFromKey } from "./labels";
+import { humaniseId, labelFromKey, stationPreposition } from "./labels";
 
 export interface FactionState {
   name: string;
@@ -316,6 +316,10 @@ export function applyJournalEvent(
       client = { ...client, odyssey: asBoolean(event.Odyssey) };
       break;
     }
+    case "GameModeChange": {
+      next.gameMode = asString(event.GameMode) ?? next.gameMode;
+      break;
+    }
     case "Commander": {
       next.commanderName = asString(event.Name) ?? next.commanderName;
       break;
@@ -493,13 +497,17 @@ export function describeActivity(state: CommanderState, now: number = Date.now()
     return { label: "Ship destroyed", detail: "waiting on the rebuy screen" };
   }
   if (motion.onFoot) {
-    return { label: "On foot", detail: station ? `at ${station.name}` : arrival ? `on ${arrival}` : null };
+    // "On a carrier", but "at a station".
+    return {
+      label: "On foot",
+      detail: station ? `${stationPreposition(station.type)} ${station.name}` : arrival ? `on ${arrival}` : null,
+    };
   }
   if (motion.inSrv) {
     return { label: "In SRV", detail: arrival ? `on ${arrival}` : null };
   }
   if (motion.docked && station) {
-    return { label: "Docked", detail: `at ${station.name}` };
+    return { label: "Docked", detail: `${stationPreposition(station.type)} ${station.name}` };
   }
   const jumpStale =
     motion.jumpingSince !== null && now - motion.jumpingSince > JUMP_STALE_AFTER_MS;

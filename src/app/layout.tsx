@@ -25,13 +25,14 @@ export const metadata: Metadata = {
   applicationName: "ED:SitAware",
 };
 
-// Applies the saved theme while the document is still being parsed, so the page never
-// flashes the default theme first.
-const themeScript = `(function(){try{var s=JSON.parse(localStorage.getItem(${JSON.stringify(
+// Applies the theme while the document is still being parsed, so the page never
+// flashes the wrong one first: the player's own choice if they have made one, and
+// until then whatever light or dark setting the system itself asks for.
+const themeScript = `(function(){try{var d=document.documentElement,t=null,s=JSON.parse(localStorage.getItem(${JSON.stringify(
   SETTINGS_STORAGE_KEY,
-)})||"null");var t=s&&s.state&&s.state.theme;if(${JSON.stringify(
+)})||"null");t=s&&s.state&&s.state.theme;if(${JSON.stringify(
   THEMES,
-)}.indexOf(t)>-1)document.documentElement.setAttribute("data-theme",t)}catch(e){}})();`;
+)}.indexOf(t)>-1){d.setAttribute("data-theme",t);return}if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches){d.setAttribute("data-theme","light")}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

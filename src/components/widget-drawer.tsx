@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Download,
   FolderOpen,
+  GripVertical,
   Pin,
   Play,
   RotateCcw,
@@ -14,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { formatInt } from "@/lib/format";
+import { isDefaultCardOrder } from "@/lib/card-order";
 import { downloadProfileFile, readProfileFile } from "@/lib/profile-file";
 import type { EffectiveProfile } from "@/lib/profiles";
 import { WIDGETS, WIDGET_CATEGORIES } from "@/lib/widgets";
@@ -62,10 +64,13 @@ function ProfileSection({ profile }: { profile: EffectiveProfile }) {
       </h3>
       <p className="text-body font-semibold">{profile.name}</p>
       <p className="text-small text-muted">{profile.blurb}</p>
-      <p className="mt-2 flex flex-wrap gap-1.5">
-        <span className="badge">{profile.builtIn ? "Preset" : "Your profile"}</span>
-        {profile.modified && <span className="badge badge--warn">Tweaked</span>}
-      </p>
+      {profile.builtIn && (
+        <p className="mt-2 text-small text-muted">
+          {profile.modified
+            ? "You have changed this preset. Save it as a profile to keep the changes, or put it back to its defaults."
+            : "A preset. Change anything and save it as a profile of your own."}
+        </p>
+      )}
 
       {saving && (
         <form
@@ -101,9 +106,13 @@ function ProfileSection({ profile }: { profile: EffectiveProfile }) {
               <Save aria-hidden="true" />
               Save as profile
             </Button>
-            <Button onClick={resetProfile}>
+            <Button
+              aria-label={`Reset ${profile.name} to its defaults`}
+              title="Put this preset back to its defaults. Your changes here are discarded."
+              onClick={resetProfile}
+            >
               <RotateCcw aria-hidden="true" />
-              Reset to preset
+              Reset to defaults
             </Button>
           </>
         )}
@@ -149,13 +158,48 @@ function ProfileSection({ profile }: { profile: EffectiveProfile }) {
   );
 }
 
+/** Cards go where the player drags them; this is the way back to the starting order. */
+function CardOrderSection() {
+  const cardOrder = useSettingsStore((state) => state.cardOrder);
+  const resetCardOrder = useSettingsStore((state) => state.resetCardOrder);
+
+  return (
+    <section aria-labelledby="drawer-order" className="border-t border-line pb-2 pt-4">
+      <h3 id="drawer-order" className="hud-label mb-2 flex items-center gap-2">
+        <GripVertical className="h-4 w-4" aria-hidden="true" />
+        Card order
+      </h3>
+      <p className="text-small text-muted">
+        Drag the grip on any card to move it, on any screen. With a keyboard, press space on the grip, move
+        with the arrow keys, and press space to let go.
+      </p>
+      {!isDefaultCardOrder(cardOrder) && (
+        <div className="mt-3">
+          <Button
+            aria-label="Put the cards back in their starting order"
+            title="Put the cards back in the order they had when you arrived."
+            onClick={resetCardOrder}
+          >
+            <RotateCcw aria-hidden="true" />
+            Reset card order
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 interface WidgetDrawerProps {
   open: boolean;
   onClose: () => void;
+  /** The player asked to disconnect. The caller checks they mean it. */
+  onDisconnect: () => void;
+  /** The player asked to forget the folder. The caller checks they mean it. */
+  onForget: () => void;
 }
 
 /** The "checkbox everything" drawer: every widget on or off, pinnable, plus profiles. */
-export function WidgetDrawer({ open, onClose }: WidgetDrawerProps) {
+export function WidgetDrawer({ open, onClose, onDisconnect, onForget }: WidgetDrawerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const profile = useEffectiveProfile();
   const toggleWidget = useSettingsStore((state) => state.toggleWidget);
@@ -226,6 +270,8 @@ export function WidgetDrawer({ open, onClose }: WidgetDrawerProps) {
             );
           })}
 
+          <CardOrderSection />
+
           <section aria-labelledby="drawer-journal" className="border-t border-line pt-4">
             <h3 id="drawer-journal" className="hud-label mb-2">
               Journal
@@ -261,11 +307,11 @@ export function WidgetDrawer({ open, onClose }: WidgetDrawerProps) {
                     <FolderOpen aria-hidden="true" />
                     Change folder
                   </Button>
-                  <Button onClick={() => journal.disconnect()}>
+                  <Button onClick={onDisconnect}>
                     <Unplug aria-hidden="true" />
                     Disconnect
                   </Button>
-                  <Button variant="danger" onClick={() => void journal.forget()}>
+                  <Button variant="danger" onClick={onForget}>
                     Forget this folder
                   </Button>
                 </div>

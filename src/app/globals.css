@@ -744,10 +744,12 @@
     padding: 4px 0;
   }
 
+  /* The headings that say where you are and how things stand carry the theme colour. */
   .state__title {
     font-size: var(--text-h3);
     font-weight: 600;
     letter-spacing: -0.01em;
+    color: var(--accent-strong);
   }
 
   .state__body {
@@ -798,6 +800,66 @@
 
   .footer a:hover {
     text-decoration-color: var(--accent);
+  }
+
+  /* ---------- Card grips ---------- */
+
+  .card-grip {
+    color: var(--fg-muted);
+    cursor: grab;
+    touch-action: none;
+    /* A press on the grip must never begin a selection of the text around it. */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .card-grip:hover {
+    color: var(--fg);
+  }
+
+  .card-grip:active {
+    cursor: grabbing;
+  }
+
+  /* ---------- Asking before something hard to undo ---------- */
+
+  .confirm {
+    position: fixed;
+    inset: 0;
+    width: min(440px, calc(100vw - 32px));
+    max-width: none;
+    max-height: calc(100vh - 32px);
+    margin: auto;
+    padding: 1px;
+    color: var(--fg);
+    background: var(--panel-border-strong);
+    border: none;
+    border-radius: var(--radius);
+  }
+
+  .confirm[open] {
+    animation: confirm-in var(--dur-base) var(--ease-out);
+  }
+
+  .confirm::backdrop {
+    background: rgb(0 0 0 / 0.6);
+  }
+
+  .confirm__inner {
+    padding: 24px;
+    background: var(--surface);
+    border-radius: calc(var(--radius) - 1px);
+  }
+
+  @keyframes confirm-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 
   /* ---------- Dropping a folder onto the connect panel ---------- */

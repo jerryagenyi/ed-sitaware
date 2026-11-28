@@ -12,6 +12,8 @@ import {
   isFleetCarrier,
   isSurfaceStation,
   notableServices,
+  stationNoun,
+  stationPreposition,
   stationTypeLabel,
 } from "@/lib/journal/labels";
 import { useCommanderStore } from "@/store/commander";
@@ -19,9 +21,26 @@ import { useEffectiveProfile } from "@/store/settings";
 import { PAD_FILTERS, type ProfileConfig } from "@/lib/profiles";
 import type { PadSize } from "@/lib/ships";
 import { FILTER_KEYS, type FilterKey, type WidgetMeta } from "@/lib/widgets";
-import { Facts, HudPanel, State } from "@/components/hud-panel";
+import { Facts, State } from "@/components/hud-panel";
+import { SortableCard } from "@/components/sortable-card";
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/**
+ * The journal leaves some things out when the game starts with the commander already
+ * docked, and fills them in at the next docking. Say that, rather than showing a dash.
+ */
+const GIVEN_WHEN_YOU_DOCK = "Given when you dock";
+const GIVEN_WHEN_YOU_DOCK_HINT =
+  "The journal leaves this out when the game starts with you already docked. It is included the next time you dock.";
+
+function GivenWhenYouDock() {
+  return (
+    <span className="text-muted" title={GIVEN_WHEN_YOU_DOCK_HINT}>
+      {GIVEN_WHEN_YOU_DOCK}
+    </span>
+  );
+}
 
 /** A faction and the state it is in, coloured when that state is worth noticing. */
 function FactionLine({ name, state, activeStates = [] }: { name: string; state: string; activeStates?: readonly string[] }) {
@@ -47,12 +66,12 @@ export function SystemCard() {
 
   if (!system) {
     return (
-      <HudPanel title="Current system">
+      <SortableCard id="system" title="Current system">
         <State
           title="No location yet"
           body="Load into a session and the system you are in, who runs it and what state it is in show up here."
         />
-      </HudPanel>
+      </SortableCard>
     );
   }
 
@@ -61,39 +80,62 @@ export function SystemCard() {
     system.powerplay.controllingPower,
     ...system.powerplay.powers.filter((power) => power !== system.powerplay.controllingPower),
   ].filter(Boolean);
+  // No one lives in some systems. Nothing there has a faction, an economy or a government,
+  // and the journal says so by leaving them out: say it once, instead of a row of dashes.
+  const uninhabited = system.population === 0;
 
   return (
-    <HudPanel title="Current system">
+    <SortableCard id="system" title="Current system">
+      {uninhabited && (
+        <p className="mb-4 text-small text-muted">
+          Uninhabited. No one lives here, so there is no faction, economy or government, and no Powerplay presence.
+        </p>
+      )}
       <Facts
         items={[
           { label: "Security", value: system.security ?? UNKNOWN },
-          { label: "Allegiance", value: system.allegiance ?? UNKNOWN },
-          { label: "Economy", value: economies },
-          { label: "Government", value: system.government ?? UNKNOWN },
-          { label: "Population", value: <span className="hud-value">{formatPopulation(system.population)}</span> },
+          ...(uninhabited
+            ? []
+            : [
+                { label: "Allegiance", value: system.allegiance ?? UNKNOWN },
+                { label: "Economy", value: economies },
+                { label: "Government", value: system.government ?? UNKNOWN },
+              ]),
           {
-            label: "Controlling faction",
-            value: system.controllingFaction ? (
-              <FactionLine
-                name={system.controllingFaction.name}
-                state={system.controllingFaction.state}
-                activeStates={system.controllingFaction.activeStates}
-              />
+            label: "Population",
+            value: uninhabited ? (
+              "Uninhabited"
             ) : (
-              UNKNOWN
+              <span className="hud-value">{formatPopulation(system.population)}</span>
             ),
           },
-          {
-            label: "Powerplay",
-            value: powerplay.length > 0 ? (
-              <>
-                {powerplay.join(", ")}
-                {system.powerplay.state && <span className="badge ml-1">{system.powerplay.state}</span>}
-              </>
-            ) : (
-              system.powerplay.state ?? UNKNOWN
-            ),
-          },
+          ...(uninhabited
+            ? []
+            : [
+                {
+                  label: "Controlling faction",
+                  value: system.controllingFaction ? (
+                    <FactionLine
+                      name={system.controllingFaction.name}
+                      state={system.controllingFaction.state}
+                      activeStates={system.controllingFaction.activeStates}
+                    />
+                  ) : (
+                    UNKNOWN
+                  ),
+                },
+                {
+                  label: "Powerplay",
+                  value: powerplay.length > 0 ? (
+                    <>
+                      {powerplay.join(", ")}
+                      {system.powerplay.state && <span className="badge ml-1">{system.powerplay.state}</span>}
+                    </>
+                  ) : (
+                    system.powerplay.state ?? UNKNOWN
+                  ),
+                },
+              ]),
           {
             label: "Arrival point",
             value:
@@ -112,7 +154,7 @@ export function SystemCard() {
             : []),
         ]}
       />
-    </HudPanel>
+    </SortableCard>
   );
 }
 
@@ -141,11 +183,10 @@ export function StationCard() {
   const commander = useCommanderStore((state) => state.commander);
   const profile = useEffectiveProfile();
   const { station, lastStation, system } = commander;
-  const { distanceFromStarLs, type } = station ?? {};
 
   if (!station) {
     return (
-      <HudPanel title="Current station">
+      <SortableCard id="station" title="Current station">
         <State
           title="Not docked"
           body={
@@ -160,17 +201,21 @@ export function StationCard() {
             )
           }
         />
-      </HudPanel>
+      </SortableCard>
     );
   }
 
+  const { distanceFromStarLs, type } = station;
+  const noun = stationNoun(type);
   const distance = distanceFromStarLs ?? null;
   const overLimit = distance !== null && distance > profile.maxSupercruiseLs;
   const services = notableServices(station.services);
 
   return (
-    <HudPanel
-      title="Current station"
+    <SortableCard
+      id="station"
+      // "Current carrier" to someone sitting on their own carrier: they are not at a station.
+      title={noun === "carrier" ? "Current carrier" : "Current station"}
       actions={
         <>
           {isFleetCarrier(type) && <span className="badge">Fleet carrier</span>}
@@ -178,7 +223,7 @@ export function StationCard() {
         </>
       }
     >
-      <p className="mb-1 text-h3 font-semibold">{station.name}</p>
+      <p className="mb-1 text-h3 font-semibold text-accent-strong">{station.name}</p>
       <p className="mb-4 text-small text-muted">
         {stationTypeLabel(type) ?? "Unknown type"}
         {system?.name && ` · ${system.name}`}
@@ -187,27 +232,27 @@ export function StationCard() {
         items={[
           {
             label: "From arrival star",
-            value: (
-              <>
-                <span className={`hud-value ${overLimit ? "text-warn" : ""}`}>
-                  {distance === null ? UNKNOWN : formatInt(distance)}
-                </span>{" "}
-                Ls
-                {overLimit && (
-                  <>
-                    {" "}
-                    <span className="badge badge--warn">Over your {formatInt(profile.maxSupercruiseLs)} Ls limit</span>
-                  </>
-                )}
-              </>
-            ),
+            value:
+              distance === null ? (
+                <GivenWhenYouDock />
+              ) : (
+                <>
+                  <span className={`hud-value ${overLimit ? "text-warn" : ""}`}>{formatInt(distance)}</span> Ls
+                  {overLimit && (
+                    <>
+                      {" "}
+                      <span className="badge badge--warn">Over your {formatInt(profile.maxSupercruiseLs)} Ls limit</span>
+                    </>
+                  )}
+                </>
+              ),
           },
           {
             label: "Landing pads",
             value: station.pads ? (
               <Pads pads={station.pads} yours={commander.ship?.padSize ?? null} />
             ) : (
-              UNKNOWN
+              <GivenWhenYouDock />
             ),
           },
           { label: "Economy", value: station.economy ?? UNKNOWN },
@@ -229,9 +274,9 @@ export function StationCard() {
           ))}
         </ul>
       ) : (
-        <p className="text-small text-muted">No services were listed for this station.</p>
+        <p className="text-small text-muted">No services were listed for this {noun}.</p>
       )}
-    </HudPanel>
+    </SortableCard>
   );
 }
 
@@ -257,15 +302,16 @@ export function HazardCard({ widget }: { widget: WidgetMeta }) {
     ...stationHazards(commander.station, profile.maxSupercruiseLs),
     ...systemHazards(commander.system),
   ]);
+  const station = commander.station;
 
   return (
-    <HudPanel title={widget.label} actions={<span className="badge">From your journal</span>}>
+    <SortableCard id={widget.id} title={widget.label} actions={<span className="badge">From your journal</span>}>
       {hazards.length === 0 ? (
         <State
           title="All clear"
           body={
             commander.system
-              ? `Nothing in your journal flags ${commander.system.name} or the station you are at. Check the limit in the control bar if you want a shorter leash.`
+              ? `Nothing in your journal flags ${commander.system.name} or the ${stationNoun(station?.type)} you are ${stationPreposition(station?.type)}. Check the limit in the control bar if you want a shorter leash.`
               : "Once you are in a system, long approaches, planetary ports and factions in Lockdown are flagged here."
           }
         />
@@ -276,7 +322,7 @@ export function HazardCard({ widget }: { widget: WidgetMeta }) {
           ))}
         </ul>
       )}
-    </HudPanel>
+    </SortableCard>
   );
 }
 
@@ -314,7 +360,7 @@ export function PendingWidgetCard({
 }) {
   const keys = FILTER_KEYS.filter((key) => widget.filters[key]);
   return (
-    <HudPanel title={widget.label} actions={<span className="badge">Sector feed</span>}>
+    <SortableCard id={widget.id} title={widget.label} actions={<span className="badge">Sector feed</span>}>
       <p className="text-small text-muted">{widget.description}</p>
       <h3 className="hud-label mb-2 mt-4">Will search</h3>
       <Facts
@@ -329,7 +375,6 @@ export function PendingWidgetCard({
         }))}
       />
       <p className="mt-4 border-t border-line pt-3 text-caption leading-relaxed text-muted">{SECTOR_NOTE}</p>
-    </HudPanel>
+    </SortableCard>
   );
 }
-
